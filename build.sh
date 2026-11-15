@@ -55,6 +55,8 @@ install_facegen() {
   local dest_root="$1"
   local src_geom="$HERE/Data/$FACEGEOM_REL"
   local src_tint="$HERE/Data/$FACETINT_REL"
+  # Wipe dest first so dropped overrides (e.g. male default head) don't linger.
+  rm -rf "$dest_root/$FACEGEOM_REL" "$dest_root/$FACETINT_REL"
   if [[ ! -d "$src_geom" && ! -d "$src_tint" ]]; then
     return
   fi

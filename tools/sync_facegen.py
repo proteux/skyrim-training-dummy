@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Sync RaceMenu CharGen exports into FaceGen paths for PTX_TrainingDummy.
 
-Copies Male_Dummy / Female_Dummy from Data/SKSE/Plugins/CharGen into:
-  meshes/.../FaceGeom/PTX_TrainingDummy.esp/00000801.nif (male) / 00000802.nif (female)
-  textures/.../FaceTint/PTX_TrainingDummy.esp/0000080x.dds
+Female only: Female_Dummy -> FaceGen 00000802. Male uses the EncBandit default
+head (no FaceGen override), so Male_Dummy CharGen exports are ignored and any
+leftover 00000801 FaceGen files are removed from repo Data.
 
 Also writes CharGen/<Name>.nif.dds — RaceMenu embeds that tint path inside the .nif,
 so FaceGen heads stay colored without NifSkope path rewriting.
@@ -16,10 +16,11 @@ import sys
 from pathlib import Path
 
 ESP = "PTX_TrainingDummy.esp"
+# Male (00000801) intentionally omitted — default EncBandit head.
 PAIRS = (
-    ("Male_Dummy", "00000801"),
     ("Female_Dummy", "00000802"),
 )
+MALE_FORM_ID = "00000801"
 
 
 def sync(data: Path, repo_data: Path) -> int:
@@ -32,6 +33,11 @@ def sync(data: Path, repo_data: Path) -> int:
     tint_repo = repo_data / "textures" / "actors" / "character" / "FaceGenData" / "FaceTint" / ESP
     geom_repo.mkdir(parents=True, exist_ok=True)
     tint_repo.mkdir(parents=True, exist_ok=True)
+
+    for path in (geom_repo / f"{MALE_FORM_ID}.nif", tint_repo / f"{MALE_FORM_ID}.dds"):
+        if path.is_file():
+            path.unlink()
+            print(f"Removed male FaceGen override {path.name}")
 
     missing = False
     for stem, form_id in PAIRS:

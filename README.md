@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Both use RaceMenu FaceGen heads and keep the template outfit / keywords so SPID and outfit distributors can dress them. One of each can be out at the same time.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Female uses a RaceMenu FaceGen head; male keeps the EncBandit default head (skin matches the body). Both keep the template outfit / keywords so SPID and outfit distributors can dress them. One of each can be out at the same time.
 
 ## Requirements
 
@@ -48,9 +48,10 @@ The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo 
 
 ## Faces
 
-RaceMenu Sculpt → Export Head as `Male_Dummy` / `Female_Dummy` into `Data/SKSE/Plugins/CharGen/`.
+Female: RaceMenu Sculpt → Export Head as `Female_Dummy` into `Data/SKSE/Plugins/CharGen/`.
+`make live` runs `tools/sync_facegen.py`, which copies into FaceGen FormID `00000802`.
 
-`make live` runs `tools/sync_facegen.py`, which copies into FaceGen FormIDs `00000801` (male) and `00000802` (female).
+Male: no FaceGen override — uses the EncBandit Nord default head.
 
 ## Build notes
 

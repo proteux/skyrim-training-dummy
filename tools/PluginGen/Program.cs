@@ -209,7 +209,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 // --- NPCs 0x801 / 0x802 ---
 // Both: EncBandit Nord — generic leveled bases so naked/body morph paths work
 // (unique named clones like Alvor/Ysolda went solid black when undressed).
-// FaceGen heads still come from CharGen Male_Dummy / Female_Dummy.
+// Female FaceGen from CharGen Female_Dummy; male keeps the default EncBandit head.
 var maleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale"));
 var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
 mod.Npcs.Add(maleNpc);
@@ -367,7 +367,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 mod.ModHeader.Author = "proteux";
-mod.ModHeader.Description = "Personal immortal training dummies (EncBandit Nord male/female + RaceMenu FaceGen).";
+mod.ModHeader.Description = "Personal immortal training dummies (EncBandit Nord; female RaceMenu FaceGen).";
 mod.ModHeader.MasterReferences.Clear();
 mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
 mod.IsSmallMaster = true;
