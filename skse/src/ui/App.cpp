@@ -66,17 +66,17 @@ namespace tdui::ui {
             return peak;
         }
 
-        void DrawRateMeter(const char* label, const char* plotId, float rate5, float total5, float rate10,
-            float total10, const float* buckets, float scaleMax, const ImVec4& color) {
+        void DrawMeterHeading(const char* label, float rate10, float rate5, const ImVec4& color) {
             TextColored(color, "%s", label);
             SameLine();
             Text("%.1f/s", rate10);
-            TextDisabled("5s %.1f/s (%.0f)   ·   10s %.1f/s (%.0f)", rate5, total5, rate10, total10);
+            TextDisabled("5s %.1f/s", rate5);
+        }
 
-            const std::string overlay = std::format("{:.1f}/s", rate10);
+        void DrawMeterPlot(const char* plotId, const float* buckets, float scaleMax, const ImVec4& color) {
             PushStyleColor(ImGuiCol_PlotHistogram, color);
-            PlotHistogram(plotId, buckets, kMeterBuckets, 0, overlay.c_str(), 0.0f, scaleMax,
-                ImVec2{ -1.0f, 96.0f });
+            // No overlay — the heading already shows the rate; empty label keeps the plot full-width.
+            PlotHistogram(plotId, buckets, kMeterBuckets, 0, nullptr, 0.0f, scaleMax, ImVec2{ -1.0f, 88.0f });
             PopStyleColor();
         }
     }
@@ -318,14 +318,22 @@ namespace tdui::ui {
                                                  SeriesPeak(healBuckets, kMeterBuckets)) *
                                                  1.15f);
 
+        // Headings and plots are separate rows so both graphs share one baseline
+        // even when one column's text wraps.
         if (BeginTable("##meters", 2, ImGuiTableFlags_SizingStretchSame)) {
+            TableNextRow();
             TableNextColumn();
-            DrawRateMeter("DPS", "##dpsplot", d5 / 5.0f, d5, d10 / 10.0f, d10, damageBuckets, scaleMax, kDamage);
+            DrawMeterHeading("DPS", d10 / 10.0f, d5 / 5.0f, kDamage);
             TableNextColumn();
-            DrawRateMeter("HPS", "##hpsplot", h5 / 5.0f, h5, h10 / 10.0f, h10, healBuckets, scaleMax, kHeal);
+            DrawMeterHeading("HPS", h10 / 10.0f, h5 / 5.0f, kHeal);
+
+            TableNextRow();
+            TableNextColumn();
+            DrawMeterPlot("##dpsplot", damageBuckets, scaleMax, kDamage);
+            TableNextColumn();
+            DrawMeterPlot("##hpsplot", healBuckets, scaleMax, kHeal);
             EndTable();
         }
-        TextDisabled("Last %.0fs  (bars share scale)", kMeterWindowSec);
     }
 
     void App::DrawLog() {
