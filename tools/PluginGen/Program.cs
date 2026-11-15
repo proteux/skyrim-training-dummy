@@ -63,16 +63,16 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
     npc.Configuration.Level = new NpcLevel { Level = 1 };
     npc.Configuration.CalcMinLevel = 0;
     npc.Configuration.CalcMaxLevel = 0;
+    // Factions stay empty: runtime SafeFaction / HostileFaction only (guards stay out).
     npc.Factions.Clear();
     npc.Packages.Clear();
-    // Drop faction keywords so SPID / outfit distributors don't force unpickable gear.
-    npc.Keywords?.Clear();
+    // Keep template keywords + DefaultOutfit so SPID / outfit distributors can dress
+    // them from the load order. Class is left as-duplicated for Class filters.
     // Strip warpaint / makeup layers from the template face record.
     npc.TintLayers?.Clear();
     // Match typical RaceMenu export weight so FaceGen necks line up better.
     npc.Weight = 100f;
-    // Inventory gear is given at spawn so pickpocket can change it.
-    npc.DefaultOutfit.SetToNull();
+    // Outfit on the base; clear loose Items so they don't stack with the outfit.
     npc.Items?.Clear();
     return npc;
 }

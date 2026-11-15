@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Male base is Alvor; female is EncBandit Nord. Both use RaceMenu FaceGen heads and spawn in bandit gear. One of each can be out at the same time.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Male base is Alvor; female is EncBandit Nord. Both use RaceMenu FaceGen heads and keep the template outfit / keywords so SPID and outfit distributors can dress them. One of each can be out at the same time.
 
 ## Requirements
 
@@ -44,7 +44,7 @@ SKSE plugin log:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/TrainingDummyUI.log`
 
-The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit). With **Enemy** or **Archnemesis**, harmful MTF Spell auras that check `IsHostileToActor` hit them; other ranks stay friendly for blessing-style tests.
+The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Gear comes from the NPC `DefaultOutfit` plus whatever SPID / outfit distributors match; factions stay script-controlled so guards stay out. With **Enemy** or **Archnemesis**, harmful MTF Spell auras that check `IsHostileToActor` hit them; other ranks stay friendly for blessing-style tests.
 
 ## Faces
 

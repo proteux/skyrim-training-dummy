@@ -178,12 +178,8 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	slot.ForceRefTo(dummy)
 	ResetAliasHealthTracking(slot)
 	StartAliasPinWatch(slot, dummy)
-
-	Utility.Wait(0.25)
-	GiveStartingGear(dummy)
-	; Gear equip can shove packages; re-pin and refresh the spawn anchor.
-	ConfigureDummy(dummy)
-	StartAliasPinWatch(slot, dummy)
+	; Gear comes from the NPC DefaultOutfit and any SPID / outfit distributors
+	; that match the template keywords — no script UnequipAll / forced bandit set.
 
 	Int level = EffectiveLevel()
 	Float maxHp = EffectiveMaxHealth()
@@ -375,25 +371,6 @@ Function ConfigureDummy(Actor dummy)
 	; so harmful Spell auras pass IsHostileToActor without involving guards.
 	SetFactionMembership(dummy, ResolveSafeFaction(), True)
 	SetFactionMembership(dummy, ResolveHostileFaction(), rank <= -3)
-EndFunction
-
-Function GiveStartingGear(Actor dummy)
-	If !dummy
-		Return
-	EndIf
-	dummy.UnequipAll()
-	EquipFromFile(dummy, 0x06F393) ; ArmorBanditCuirass
-	EquipFromFile(dummy, 0x06F398) ; ArmorBanditBoots
-	EquipFromFile(dummy, 0x06F39B) ; ArmorBanditGauntlets
-	; No helmet — RaceMenu/KS hair from FaceGen stays visible.
-EndFunction
-
-Function EquipFromFile(Actor dummy, Int formId)
-	Form item = Game.GetFormFromFile(formId, "Skyrim.esm")
-	If item
-		dummy.AddItem(item, 1, True)
-		dummy.EquipItem(item, False, True)
-	EndIf
 EndFunction
 
 Function Notify(String asText)
