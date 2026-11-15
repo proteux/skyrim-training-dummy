@@ -32,6 +32,5 @@ namespace tdui::ui {
         SKSEMenuFramework::Model::WindowInterface* window_ = nullptr;
         int frame_ = -1;
         bool autoScroll_ = true;
-        std::size_t lastLogCount_ = 0;
     };
 }

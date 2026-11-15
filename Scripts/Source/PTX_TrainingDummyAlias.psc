@@ -183,9 +183,8 @@ Event OnUpdate()
 	EndIf
 
 	PinInPlace(dummy)
-	; SetAV HealRate is overwritten; re-force every tick so start-% HP stays put.
-	TrainingDummyUI.KillEngineRegen(dummy)
 	; CastAs / Spell aura apply effects without OnHit — catch HP drops here.
+	; Small poll heals are engine OOC regen (clamped); larger pulses stay for aura tests.
 	ReportHealthDrop(dummy, "aura/poll")
 
 	If WatchingCombat
@@ -226,8 +225,8 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 	If delta < 0.5 && delta > -0.5
 		Return
 	EndIf
-	LastHealth = remaining
 	If delta > 0.0
+		LastHealth = remaining
 		Int dmgInt = delta as Int
 		String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=?"
 		Debug.TraceUser("TrainingDummy", line)
@@ -241,6 +240,13 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 		Return
 	EndIf
 	Float heal = 0.0 - delta
+	; Small poll gains are engine OOC regen (HealRate ForceAV does not stop it).
+	; Larger pulses and OnHit heals still count for blessing / aura tests.
+	If TrainingDummyUI.ClampPollHeal(dummy, heal)
+		LastHealth = remaining - heal
+		Return
+	EndIf
+	LastHealth = remaining
 	Int healInt = heal as Int
 	String line = "heal amt=" + healInt + " source=" + sourceName + " aggressor=?"
 	Debug.TraceUser("TrainingDummy", line)
@@ -316,7 +322,6 @@ Function Configure()
 		level = Game.GetPlayer().GetLevel()
 		maxHp = (level as Float) * 50.0
 		startHp = maxHp
-		TrainingDummyUI.KillEngineRegen(dummy)
 		dummy.SetActorValue("Health", maxHp)
 		dummy.RestoreActorValue("Health", maxHp)
 	EndIf

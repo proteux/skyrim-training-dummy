@@ -82,7 +82,7 @@ Float Function EffectiveStartHealth()
 EndFunction
 
 ; Sets max HP, then current HP to afCurrent (clamped to max).
-; KillEngineRegen zeros HealRate — Papyrus SetAV does not stick on those AVs.
+; Engine OOC regen is undone on the alias poll path (ForceAV HealRate is ineffective).
 Function ApplyHealth(Actor dummy, Float afMaxHp, Float afCurrent)
 	If !dummy
 		Return
@@ -95,7 +95,6 @@ Function ApplyHealth(Actor dummy, Float afMaxHp, Float afCurrent)
 	ElseIf afCurrent > afMaxHp
 		afCurrent = afMaxHp
 	EndIf
-	TrainingDummyUI.KillEngineRegen(dummy)
 	dummy.SetActorValue("Health", afMaxHp)
 	dummy.RestoreActorValue("Health", afMaxHp)
 	If afCurrent < afMaxHp

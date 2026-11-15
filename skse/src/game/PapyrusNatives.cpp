@@ -51,27 +51,26 @@ namespace tdui::game {
             actor->SetDisplayName(name, true);
         }
 
-        // Papyrus SetActorValue on HealRate is ignored / overwritten; force the
-        // permanent modifier so current == 0 (idempotent if called every pin tick).
-        void ForceAvTo(RE::ActorValueOwner* values, RE::ActorValue av, float target) {
-            values->SetBaseActorValue(av, target);
-            const float current = values->GetActorValue(av);
-            const float delta = target - current;
-            if (delta > 0.001f || delta < -0.001f) {
-                values->ModActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent, av, delta);
-            }
-        }
-
-        void KillEngineRegen(RE::StaticFunctionTag*, RE::Actor* actor) {
-            if (!actor) {
-                return;
+        // Undo small poll-only HP gains from engine OOC regen. Larger pulses (blessing /
+        // aura CastAs) are left alone so heal testing still works. OnHit heals never
+        // reach this path. ForceAV on HealRate does not stop engine regen.
+        bool ClampPollHeal(RE::StaticFunctionTag*, RE::Actor* actor, float healAmount) {
+            if (!actor || healAmount <= 0.0f) {
+                return false;
             }
             auto* values = actor->AsActorValueOwner();
             if (!values) {
-                return;
+                return false;
             }
-            ForceAvTo(values, RE::ActorValue::kHealRate, 0.0f);
-            ForceAvTo(values, RE::ActorValue::kHealRateMult, 0.0f);
+            const float maxHp = values->GetBaseActorValue(RE::ActorValue::kHealth);
+            // Vanilla HealRate ~0.7%/s; pin poll ~0.25s → ~0.175% of max. Allow slack
+            // for hitchy frames; anything bigger is treated as a real heal.
+            const float regenCap = std::max(8.0f, maxHp * 0.01f);
+            if (healAmount > regenCap) {
+                return false;
+            }
+            values->DamageActorValue(RE::ActorValue::kHealth, healAmount);
+            return true;
         }
 
         bool Register(RE::BSScript::IVirtualMachine* vm) {
@@ -79,7 +78,7 @@ namespace tdui::game {
             vm->RegisterFunction("LogHit", kScript, LogHit);
             vm->RegisterFunction("SetActorLevel", kScript, SetActorLevel);
             vm->RegisterFunction("SetDisplayName", kScript, SetDisplayName);
-            vm->RegisterFunction("KillEngineRegen", kScript, KillEngineRegen);
+            vm->RegisterFunction("ClampPollHeal", kScript, ClampPollHeal);
             logger::info("Registered Papyrus natives on {}", kScript);
             return true;
         }

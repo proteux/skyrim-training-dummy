@@ -9,5 +9,5 @@ Function LogHit(Float afDamage, String asLine) global native
 Function SetActorLevel(Actor akActor, Int aiLevel) global native
 ; Per-instance FULL name (shared ActorBases can't hold three distinct names).
 Function SetDisplayName(Actor akActor, String asName) global native
-; Zero HealRate / HealRateMult (Papyrus SetAV does not stick on these).
-Function KillEngineRegen(Actor akActor) global native
+; Undo small poll-only HP gains (engine OOC regen). Larger pulses pass through.
+Bool Function ClampPollHeal(Actor akActor, Float afHealAmount) global native

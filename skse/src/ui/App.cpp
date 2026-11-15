@@ -247,7 +247,6 @@ namespace tdui::ui {
     void App::DrawLog() {
         if (Button("Clear log")) {
             game::CombatLog::Get().Clear();
-            lastLogCount_ = 0;
         }
         SameLine();
         if (Button("Copy to clipboard")) {
@@ -268,18 +267,16 @@ namespace tdui::ui {
         for (const auto& e : lines) {
             TextUnformatted(e.line.c_str());
         }
-        if (autoScroll_ && lines.size() != lastLogCount_) {
+        // SetScrollHereY is deferred until EndChild, so never infer "scrolled up"
+        // from GetScrollY on the same frame — that was clearing the checkbox.
+        if (autoScroll_) {
             SetScrollHereY(1.0f);
-        }
-        // If the user scrolled up, stop forcing the bottom.
-        if (GetScrollMaxY() > 0.0f && GetScrollY() < GetScrollMaxY() - 8.0f) {
-            if (lines.size() != lastLogCount_) {
-                autoScroll_ = false;
-            }
-        } else if (lines.size() != lastLogCount_) {
+        } else if (GetScrollMaxY() <= 0.0f || GetScrollY() >= GetScrollMaxY() - 8.0f) {
             autoScroll_ = true;
         }
-        lastLogCount_ = lines.size();
+        if (IsWindowHovered() && GetIO()->MouseWheel > 0.0f) {
+            autoScroll_ = false;
+        }
         EndChild();
     }
 }
