@@ -60,6 +60,9 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
     npc.Factions.Clear();
     npc.Packages.Clear();
+    // Inventory gear is given at spawn so pickpocket can change it.
+    npc.DefaultOutfit.SetToNull();
+    npc.Items?.Clear();
     return npc;
 }
 

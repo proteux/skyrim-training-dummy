@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging). Immortal, non-hostile, matches the player level. Male and female bandit looks. At most one in the world.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal, non-hostile, matches the player level. Male and female bandit looks. At most one in the world.
 
 ## Requirements
 
@@ -9,7 +9,7 @@ Personal test dummy for Magic Tattoos (Hex damage, hit logging). Immortal, non-h
 ## Install
 
 ```
-cd "G:/Skyrim Tools/training-dummy"
+cd "/m/Repositories/personal (github)/skyrim-training-dummy"
 make live
 ```
 
@@ -17,9 +17,11 @@ Enable `PTX_TrainingDummy.esp` in Vortex (F5 if it is not listed). Restart Skyri
 
 ## Use
 
-- **Summon Male Training Dummy** — cast on yourself; places the dummy in front of you. Replaces any existing dummy.
+- **Summon Male Training Dummy** — cast on yourself; places the dummy in front of you, facing you. Replaces any existing dummy.
 - **Summon Female Training Dummy** — same, female bandit.
 - **Dismiss Training Dummy** — removes the current dummy.
+
+The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit), so you can pickpocket it off or reverse-pickpocket new clothes on. Undress the chest to see body tattoos.
 
 Each hit is appended to a user log (also a short on-screen notification):
 
@@ -31,4 +33,4 @@ Harmful MTF spell auras that require hostility will not hit this dummy; use a re
 
 ## Build notes
 
-Same layout as the Sanguine's Trade converter: Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen reads `Skyrim.esm` to clone the bandit templates.
+Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen reads `Skyrim.esm` to clone the bandit templates.

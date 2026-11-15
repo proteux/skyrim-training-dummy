@@ -52,8 +52,11 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	Float x = SpawnDistance * Math.Sin(az)
 	Float y = SpawnDistance * Math.Cos(az)
 	dummy.MoveTo(akCaster, x, y, 0.0, True)
+	; Face the player (MoveTo matched caster yaw).
+	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
 	ConfigureDummy(dummy)
+	GiveStartingGear(dummy)
 	DummyAlias.ForceRefTo(dummy)
 
 	Debug.OpenUserLog("TrainingDummy")
@@ -85,8 +88,33 @@ Function ConfigureDummy(Actor dummy)
 	EndIf
 	Int level = Game.GetPlayer().GetLevel()
 	dummy.SetGhost(False)
-	dummy.EnableAI(False)
+	; Keep AI on so RaceMenu/MTF overlays redraw; hold in place instead.
+	dummy.EnableAI(True)
+	dummy.SetDontMove(True)
 	dummy.SetLevel(level)
 	dummy.SetActorValue("Health", 10000.0)
 	dummy.RestoreActorValue("Health", 10000.0)
+	Actor player = Game.GetPlayer()
+	If player
+		dummy.SetRelationshipRank(player, 3) ; Friend — pickpocket / reverse-pickpocket without a fight
+	EndIf
+EndFunction
+
+; Inventory gear (not DefaultOutfit) so pickpocket can strip or dress them.
+Function GiveStartingGear(Actor dummy)
+	If !dummy
+		Return
+	EndIf
+	EquipFromFile(dummy, 0x06F393) ; ArmorBanditCuirass
+	EquipFromFile(dummy, 0x06F398) ; ArmorBanditBoots
+	EquipFromFile(dummy, 0x06F39B) ; ArmorBanditGauntlets
+	EquipFromFile(dummy, 0x06F39E) ; ArmorBanditHelmet
+EndFunction
+
+Function EquipFromFile(Actor dummy, Int formId)
+	Form item = Game.GetFormFromFile(formId, "Skyrim.esm")
+	If item
+		dummy.AddItem(item, 1, True)
+		dummy.EquipItem(item, False, True)
+	EndIf
 EndFunction

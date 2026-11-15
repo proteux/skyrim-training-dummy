@@ -57,7 +57,8 @@ Function Configure()
 		Return
 	EndIf
 	dummy.SetGhost(False)
-	dummy.EnableAI(False)
+	dummy.EnableAI(True)
+	dummy.SetDontMove(True)
 	dummy.SetLevel(Game.GetPlayer().GetLevel())
 	dummy.SetActorValue("Health", 10000.0)
 	dummy.RestoreActorValue("Health", 10000.0)
