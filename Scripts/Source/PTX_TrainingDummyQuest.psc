@@ -10,6 +10,14 @@ Spell Property DismissSpell Auto
 Float Property SpawnDistance = 150.0 Auto
 Float Property SideOffset = 40.0 Auto
 
+; UI / settings — health max = EffectiveLevel() * HealthPerLevel
+Bool Property MatchPlayerLevel = True Auto
+Int Property DummyLevel = 1 Auto
+Float Property HealthPerLevel = 50.0 Auto
+Bool Property MuteNotifications = True Auto
+; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) for harmful Spell aura tests.
+Int Property RelationshipRank = 3 Auto
+
 Event OnInit()
 	RegisterForSingleUpdate(2.0)
 EndEvent
@@ -17,6 +25,48 @@ EndEvent
 Event OnUpdate()
 	EnsurePlayerKit()
 EndEvent
+
+Int Function EffectiveLevel()
+	If MatchPlayerLevel
+		Actor player = Game.GetPlayer()
+		If player
+			Return player.GetLevel()
+		EndIf
+		Return 1
+	EndIf
+	If DummyLevel < 1
+		Return 1
+	EndIf
+	Return DummyLevel
+EndFunction
+
+Float Function EffectiveMaxHealth()
+	Float per = HealthPerLevel
+	If per < 1.0
+		per = 1.0
+	EndIf
+	Return (EffectiveLevel() as Float) * per
+EndFunction
+
+Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Bool abMuteNotifications, Int aiRelationshipRank)
+	MatchPlayerLevel = abMatchPlayer
+	If aiLevel < 1
+		aiLevel = 1
+	EndIf
+	DummyLevel = aiLevel
+	If afHealthPerLevel < 1.0
+		afHealthPerLevel = 1.0
+	EndIf
+	HealthPerLevel = afHealthPerLevel
+	MuteNotifications = abMuteNotifications
+	If aiRelationshipRank < -4
+		aiRelationshipRank = -4
+	ElseIf aiRelationshipRank > 3
+		aiRelationshipRank = 3
+	EndIf
+	RelationshipRank = aiRelationshipRank
+	ReassertLiveDummy()
+EndFunction
 
 ; Spells once per character. Safe to call again after a load.
 Function EnsurePlayerKit()
@@ -27,14 +77,67 @@ Function EnsurePlayerKit()
 	If player.HasSpell(SummonMaleSpell)
 		Return
 	EndIf
-	player.AddSpell(SummonMaleSpell, False)
+	GivePlayerSpells()
+EndFunction
+
+Function GivePlayerSpells()
+	Actor player = Game.GetPlayer()
+	If !player
+		Return
+	EndIf
+	If SummonMaleSpell
+		player.AddSpell(SummonMaleSpell, False)
+	EndIf
 	If SummonFemaleSpell
 		player.AddSpell(SummonFemaleSpell, False)
 	EndIf
 	If DismissSpell
 		player.AddSpell(DismissSpell, False)
 	EndIf
-	Debug.Notification("Training Dummy spells added.")
+	Notify("Training Dummy spells added.")
+	TrainingDummyUI.LogLine("--- spells added ---")
+EndFunction
+
+Function RemovePlayerSpells()
+	Actor player = Game.GetPlayer()
+	If !player
+		Return
+	EndIf
+	If SummonMaleSpell
+		player.RemoveSpell(SummonMaleSpell)
+	EndIf
+	If SummonFemaleSpell
+		player.RemoveSpell(SummonFemaleSpell)
+	EndIf
+	If DismissSpell
+		player.RemoveSpell(DismissSpell)
+	EndIf
+	Notify("Training Dummy spells removed.")
+	TrainingDummyUI.LogLine("--- spells removed ---")
+EndFunction
+
+Bool Function PlayerHasSpells()
+	Actor player = Game.GetPlayer()
+	If !player || !SummonMaleSpell
+		Return False
+	EndIf
+	Return player.HasSpell(SummonMaleSpell)
+EndFunction
+
+Function SummonMale()
+	ActorBase base = Game.GetFormFromFile(0x801, "PTX_TrainingDummy.esp") as ActorBase
+	Actor player = Game.GetPlayer()
+	If player && base
+		SpawnInFrontOf(player, base)
+	EndIf
+EndFunction
+
+Function SummonFemale()
+	ActorBase base = Game.GetFormFromFile(0x802, "PTX_TrainingDummy.esp") as ActorBase
+	Actor player = Game.GetPlayer()
+	If player && base
+		SpawnInFrontOf(player, base)
+	EndIf
 EndFunction
 
 Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
@@ -44,14 +147,14 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 
 	ReferenceAlias slot = AliasForBase(akBase)
 	If !slot
-		Debug.Notification("Training Dummy: no alias for that base.")
+		Notify("Training Dummy: no alias for that base.")
 		Return
 	EndIf
 	ClearAlias(slot)
 
 	Actor dummy = akCaster.PlaceActorAtMe(akBase)
 	If !dummy
-		Debug.Notification("Training Dummy: PlaceActorAtMe failed.")
+		Notify("Training Dummy: PlaceActorAtMe failed.")
 		Return
 	EndIf
 
@@ -73,15 +176,20 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	Utility.Wait(0.25)
 	GiveStartingGear(dummy)
 
+	Int level = EffectiveLevel()
+	Float maxHp = EffectiveMaxHealth()
 	Debug.OpenUserLog("TrainingDummy")
-	Debug.TraceUser("TrainingDummy", "--- summon level=" + Game.GetPlayer().GetLevel() + " base=" + akBase.GetName() + " ---")
-	Debug.Notification("Training Dummy summoned.")
+	String line = "--- summon level=" + level + " hp=" + (maxHp as Int) + " base=" + akBase.GetName() + " ---"
+	Debug.TraceUser("TrainingDummy", line)
+	TrainingDummyUI.LogLine(line)
+	Notify("Training Dummy summoned.")
 EndFunction
 
 Function ClearDummy()
 	ClearAlias(MaleAlias)
 	ClearAlias(FemaleAlias)
 	Debug.TraceUser("TrainingDummy", "--- dismiss ---")
+	TrainingDummyUI.LogLine("--- dismiss ---")
 EndFunction
 
 Function ClearAlias(ReferenceAlias slot)
@@ -129,24 +237,78 @@ EndFunction
 Function ResetAliasHealthTracking(ReferenceAlias slot)
 	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
 	If typed
-		typed.ResetHealthTracking()
+		typed.SyncFromQuest()
 	EndIf
+EndFunction
+
+Function HealLiveDummies()
+	Float maxHp = EffectiveMaxHealth()
+	If MaleAlias
+		Actor male = MaleAlias.GetActorReference()
+		If male
+			male.SetActorValue("Health", maxHp)
+			male.RestoreActorValue("Health", maxHp)
+			ResetAliasHealthTracking(MaleAlias)
+		EndIf
+	EndIf
+	If FemaleAlias
+		Actor female = FemaleAlias.GetActorReference()
+		If female
+			female.SetActorValue("Health", maxHp)
+			female.RestoreActorValue("Health", maxHp)
+			ResetAliasHealthTracking(FemaleAlias)
+		EndIf
+	EndIf
+	String line = "--- heal now hp=" + (maxHp as Int) + " ---"
+	Debug.TraceUser("TrainingDummy", line)
+	TrainingDummyUI.LogLine(line)
+	Notify("Training Dummy healed.")
+EndFunction
+
+Int Function GetMaleFormID()
+	If !MaleAlias
+		Return 0
+	EndIf
+	Actor dummy = MaleAlias.GetActorReference()
+	If dummy
+		Return dummy.GetFormID()
+	EndIf
+	Return 0
+EndFunction
+
+Int Function GetFemaleFormID()
+	If !FemaleAlias
+		Return 0
+	EndIf
+	Actor dummy = FemaleAlias.GetActorReference()
+	If dummy
+		Return dummy.GetFormID()
+	EndIf
+	Return 0
 EndFunction
 
 Function ConfigureDummy(Actor dummy)
 	If !dummy
 		Return
 	EndIf
-	Int level = Game.GetPlayer().GetLevel()
+	Int level = EffectiveLevel()
+	Float maxHp = EffectiveMaxHealth()
 	dummy.SetGhost(False)
+	dummy.StopCombat()
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetLevel(level)
-	dummy.SetActorValue("Health", 1000.0)
-	dummy.RestoreActorValue("Health", 1000.0)
+	dummy.SetActorValue("Health", maxHp)
+	dummy.RestoreActorValue("Health", maxHp)
 	Actor player = Game.GetPlayer()
 	If player
-		dummy.SetRelationshipRank(player, 3)
+		Int rank = RelationshipRank
+		If rank < -4
+			rank = -4
+		ElseIf rank > 3
+			rank = 3
+		EndIf
+		dummy.SetRelationshipRank(player, rank)
 	EndIf
 EndFunction
 
@@ -167,4 +329,11 @@ Function EquipFromFile(Actor dummy, Int formId)
 		dummy.AddItem(item, 1, True)
 		dummy.EquipItem(item, False, True)
 	EndIf
+EndFunction
+
+Function Notify(String asText)
+	If MuteNotifications
+		Return
+	EndIf
+	Debug.Notification(asText)
 EndFunction

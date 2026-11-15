@@ -4,6 +4,7 @@ Scriptname Actor extends ObjectReference Hidden
 Function SetGhost(Bool abIsGhost) native
 Function EnableAI(Bool abEnable) native
 Function SetDontMove(Bool abDontMove) native
+Function StopCombat() native
 Function SetLevel(Int aiNewLevel) native
 Function SetActorValue(String asValueName, Float afValue) native
 Function RestoreActorValue(String asValueName, Float afAmount) native
@@ -11,6 +12,7 @@ Float Function GetActorValue(String asValueName) native
 Int Function GetLevel() native
 Bool Function HasSpell(Form akForm) native
 Bool Function AddSpell(Spell akSpell, Bool abVerbose = True) native
+Bool Function RemoveSpell(Spell akSpell) native
 Int Function AddItem(Form akItem, Int aiCount = 1, Bool abSilent = False) native
 Function EquipItem(Form akItem, Bool abPreventRemoval = False, Bool abSilent = False) native
 Function UnequipAll() native

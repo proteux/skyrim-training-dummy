@@ -1,4 +1,6 @@
 dist/
+skse/build/
 tools/*/bin/
 tools/*/obj/
 *.pex
+build.local.sh
