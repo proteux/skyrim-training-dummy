@@ -9,5 +9,6 @@ Function LogHit(Float afDamage, String asLine) global native
 Function SetActorLevel(Actor akActor, Int aiLevel) global native
 ; Per-instance FULL name (shared ActorBases can't hold three distinct names).
 Function SetDisplayName(Actor akActor, String asName) global native
-; Undo small poll-only HP gains (engine OOC regen). Larger pulses pass through.
-Bool Function ClampPollHeal(Actor akActor, Float afHealAmount) global native
+; Undo the expected OOC HealRate slice of a poll heal. Returns HP damaged back.
+; No-op while the actor is in combat (engine already suppresses HealRate).
+Float Function StripPollRegen(Actor akActor, Float afHealAmount, Float afElapsedSeconds) global native

@@ -51,26 +51,31 @@ namespace tdui::game {
             actor->SetDisplayName(name, true);
         }
 
-        // Undo small poll-only HP gains from engine OOC regen. Larger pulses (blessing /
-        // aura CastAs) are left alone so heal testing still works. OnHit heals never
-        // reach this path. ForceAV on HealRate does not stop engine regen.
-        bool ClampPollHeal(RE::StaticFunctionTag*, RE::Actor* actor, float healAmount) {
+        // Undo only the expected out-of-combat HealRate slice of a poll heal.
+        // Vanilla ~0.7% max HP/s; ForceAV on HealRate does not stop the engine.
+        // In combat the engine already suppresses HealRate, so this is a no-op.
+        // Returns how much HP was damaged back (0 = nothing stripped).
+        float StripPollRegen(RE::StaticFunctionTag*, RE::Actor* actor, float healAmount, float elapsedSeconds) {
             if (!actor || healAmount <= 0.0f) {
-                return false;
+                return 0.0f;
+            }
+            if (actor->IsInCombat()) {
+                return 0.0f;
             }
             auto* values = actor->AsActorValueOwner();
             if (!values) {
-                return false;
+                return 0.0f;
             }
             const float maxHp = values->GetBaseActorValue(RE::ActorValue::kHealth);
-            // Vanilla HealRate ~0.7%/s; pin poll ~0.25s → ~0.175% of max. Allow slack
-            // for hitchy frames; anything bigger is treated as a real heal.
-            const float regenCap = std::max(8.0f, maxHp * 0.01f);
-            if (healAmount > regenCap) {
-                return false;
+            // Cap elapsed so a long hitch can't eat a real heal burst.
+            const float dt = std::clamp(elapsedSeconds, 0.0f, 1.0f);
+            // 0.7%/s × 1.25 slack for hitchy polls / race variation.
+            const float expected = maxHp * 0.007f * 1.25f * dt;
+            const float undone = std::min(healAmount, expected);
+            if (undone > 0.0f) {
+                values->DamageActorValue(RE::ActorValue::kHealth, undone);
             }
-            values->DamageActorValue(RE::ActorValue::kHealth, healAmount);
-            return true;
+            return undone;
         }
 
         bool Register(RE::BSScript::IVirtualMachine* vm) {
@@ -78,7 +83,7 @@ namespace tdui::game {
             vm->RegisterFunction("LogHit", kScript, LogHit);
             vm->RegisterFunction("SetActorLevel", kScript, SetActorLevel);
             vm->RegisterFunction("SetDisplayName", kScript, SetDisplayName);
-            vm->RegisterFunction("ClampPollHeal", kScript, ClampPollHeal);
+            vm->RegisterFunction("StripPollRegen", kScript, StripPollRegen);
             logger::info("Registered Papyrus natives on {}", kScript);
             return true;
         }

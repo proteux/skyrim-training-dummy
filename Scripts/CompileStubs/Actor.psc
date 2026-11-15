@@ -6,6 +6,7 @@ Function EnableAI(Bool abEnable) native
 Function SetDontMove(Bool abDontMove) native
 Function SetRestrained(Bool abRestrained) native
 Function StopCombat() native
+Bool Function IsInCombat() native
 Function SetActorValue(String asValueName, Float afValue) native
 Function RestoreActorValue(String asValueName, Float afAmount) native
 Function DamageActorValue(String asValueName, Float afAmount) native

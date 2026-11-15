@@ -21,12 +21,15 @@ Float AnchorX = 0.0
 Float AnchorY = 0.0
 Float AnchorZ = 0.0
 Float AnchorAngleZ = 0.0
+; Real time of the last poll heal check — used to size the OOC regen strip.
+Float LastPollRealTime = 0.0
 
 Function SyncFromQuest()
 	If DummyQuest
 		MaxHealth = DummyQuest.EffectiveMaxHealth()
 	EndIf
 	LastHealth = MaxHealth
+	LastPollRealTime = Utility.GetCurrentRealTime()
 	Actor dummy = GetActorReference()
 	If dummy
 		; Keep tracking in sync if HP was just set by the quest.
@@ -184,7 +187,7 @@ Event OnUpdate()
 
 	PinInPlace(dummy)
 	; CastAs / Spell aura apply effects without OnHit — catch HP drops here.
-	; Small poll heals are engine OOC regen (clamped); larger pulses stay for aura tests.
+	; OOC HealRate is stripped by size (~0.7% max/s); real aura heals remain.
 	ReportHealthDrop(dummy, "aura/poll")
 
 	If WatchingCombat
@@ -220,6 +223,12 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 	If !dummy
 		Return
 	EndIf
+	Float now = Utility.GetCurrentRealTime()
+	Float elapsed = now - LastPollRealTime
+	If elapsed < 0.0
+		elapsed = 0.0
+	EndIf
+	LastPollRealTime = now
 	Float remaining = dummy.GetActorValue("Health")
 	Float delta = LastHealth - remaining
 	If delta < 0.5 && delta > -0.5
@@ -240,10 +249,14 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 		Return
 	EndIf
 	Float heal = 0.0 - delta
-	; Small poll gains are engine OOC regen (HealRate ForceAV does not stop it).
-	; Larger pulses and OnHit heals still count for blessing / aura tests.
-	If TrainingDummyUI.ClampPollHeal(dummy, heal)
-		LastHealth = remaining - heal
+	; Strip the expected OOC HealRate slice; keep the rest (aura / CastAs ticks).
+	Float undone = TrainingDummyUI.StripPollRegen(dummy, heal, elapsed)
+	If undone > 0.0
+		heal -= undone
+		remaining -= undone
+	EndIf
+	If heal < 0.5
+		LastHealth = remaining
 		Return
 	EndIf
 	LastHealth = remaining
@@ -330,4 +343,5 @@ Function Configure()
 	HoldStill(dummy)
 	TrainingDummyUI.SetActorLevel(dummy, level)
 	LastHealth = startHp
+	LastPollRealTime = Utility.GetCurrentRealTime()
 EndFunction
