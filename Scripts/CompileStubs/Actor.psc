@@ -4,6 +4,7 @@ Scriptname Actor extends ObjectReference Hidden
 Function SetGhost(Bool abIsGhost) native
 Function EnableAI(Bool abEnable) native
 Function SetDontMove(Bool abDontMove) native
+Function SetRestrained(Bool abRestrained) native
 Function StopCombat() native
 Function SetLevel(Int aiNewLevel) native
 Function SetActorValue(String asValueName, Float afValue) native

@@ -6,8 +6,12 @@ PTX_TrainingDummyQuest Property DummyQuest Auto
 ; Max health; also tracks HP before the latest OnHit for per-hit damage logging.
 Float Property MaxHealth = 50.0 Auto
 Float LastHealth = 50.0
-; Bleedout recovery clears DontMove / combat; reassert for a few passes.
+; Bleedout recovery clears DontMove / restrain; reassert for a few passes.
 Int PosturePassesLeft = 0
+; After damage, leave combat running until this many real seconds with no hits.
+Float Property CombatIdleSeconds = 3.0 Auto
+Float LastDamageRealTime = 0.0
+Bool WatchingCombat = False
 
 Function SyncFromQuest()
 	If DummyQuest
@@ -79,6 +83,11 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 	Else
 		Debug.Notification("Dummy hit: " + dmgInt + " dmg")
 	EndIf
+
+	PinInPlace(dummy)
+	If damage > 0.0
+		NoteDamage()
+	EndIf
 EndEvent
 
 ; Essential NPC — collapse, then stand back up at full health without chasing.
@@ -92,10 +101,10 @@ Event OnEnterBleedout()
 	EndIf
 	dummy.RestoreActorValue("Health", MaxHealth)
 	LastHealth = MaxHealth
-	HoldStill(dummy)
-	; Engine get-up / combat packages clear DontMove; keep pinning for a few seconds.
+	PinInPlace(dummy)
+	; Engine get-up packages clear pins; keep reasserting while calm timer runs.
 	PosturePassesLeft = 5
-	RegisterForSingleUpdate(0.5)
+	NoteDamage()
 	String line = "--- bleedout heal hp=" + (MaxHealth as Int) + " ---"
 	Debug.TraceUser("TrainingDummy", line)
 	TrainingDummyUI.LogLine(line)
@@ -109,21 +118,60 @@ EndEvent
 Event OnUpdate()
 	Actor dummy = GetActorReference()
 	If dummy
-		HoldStill(dummy)
+		PinInPlace(dummy)
 	EndIf
+
+	If WatchingCombat
+		Float idleFor = Utility.GetCurrentRealTime() - LastDamageRealTime
+		Float need = CombatIdleSeconds
+		If need < 0.5
+			need = 0.5
+		EndIf
+		If idleFor >= need
+			If dummy
+				dummy.StopCombat()
+			EndIf
+			WatchingCombat = False
+			String line = "--- combat calm after " + (need as Int) + "s idle ---"
+			Debug.TraceUser("TrainingDummy", line)
+			TrainingDummyUI.LogLine(line)
+		EndIf
+	EndIf
+
 	If PosturePassesLeft > 0
 		PosturePassesLeft -= 1
-		RegisterForSingleUpdate(0.75)
+	EndIf
+
+	If WatchingCombat || PosturePassesLeft > 0
+		RegisterForSingleUpdate(0.5)
 	EndIf
 EndEvent
 
+; Pin without breaking combat — restrained stops the run-in-place.
+Function PinInPlace(Actor dummy)
+	If !dummy
+		Return
+	EndIf
+	dummy.EnableAI(True)
+	dummy.SetDontMove(True)
+	dummy.SetRestrained(True)
+EndFunction
+
+Function NoteDamage()
+	LastDamageRealTime = Utility.GetCurrentRealTime()
+	WatchingCombat = True
+	RegisterForSingleUpdate(0.5)
+EndFunction
+
+; Summon / reassert: pin and clear any leftover combat.
 Function HoldStill(Actor dummy)
 	If !dummy
 		Return
 	EndIf
 	dummy.StopCombat()
-	dummy.EnableAI(True)
-	dummy.SetDontMove(True)
+	PinInPlace(dummy)
+	WatchingCombat = False
+	PosturePassesLeft = 0
 EndFunction
 
 Function Configure()
