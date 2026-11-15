@@ -248,6 +248,9 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 		Return
 	EndIf
 
+	; Shared bases / reused FormIDs can keep leftover MTF overlays — scrub before use.
+	ClearMagicTattoos(dummy)
+
 	; Claim the alias before MoveTo / Configure so a parallel summon cannot reuse it,
 	; and so pin/heal tracking attaches even if later steps hitch.
 	slot.ForceRefTo(dummy)
@@ -302,10 +305,23 @@ Function ClearAlias(ReferenceAlias slot)
 	EndIf
 	Actor dummy = slot.GetActorReference()
 	If dummy
+		ClearMagicTattoos(dummy)
 		dummy.Disable()
 		dummy.Delete()
 	EndIf
 	slot.Clear()
+EndFunction
+
+; Soft dep on Magic Tattoos Framework — drop presets, overlays, and tracking so the
+; next PlaceActorAtMe of the shared base is blank.
+Function ClearMagicTattoos(Actor akDummy)
+	If !akDummy
+		Return
+	EndIf
+	MTF_MainQuest mtf = Game.GetFormFromFile(0x803, "MagicTattoosFramework.esp") as MTF_MainQuest
+	If mtf
+		mtf.RemoveTrackedActor(akDummy)
+	EndIf
 EndFunction
 
 ReferenceAlias Function SlotAt(Bool abFemale, Int aiIndex)
