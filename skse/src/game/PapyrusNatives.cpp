@@ -51,11 +51,35 @@ namespace tdui::game {
             actor->SetDisplayName(name, true);
         }
 
+        // Papyrus SetActorValue on HealRate is ignored / overwritten; force the
+        // permanent modifier so current == 0 (idempotent if called every pin tick).
+        void ForceAvTo(RE::ActorValueOwner* values, RE::ActorValue av, float target) {
+            values->SetBaseActorValue(av, target);
+            const float current = values->GetActorValue(av);
+            const float delta = target - current;
+            if (delta > 0.001f || delta < -0.001f) {
+                values->ModActorValue(RE::ACTOR_VALUE_MODIFIER::kPermanent, av, delta);
+            }
+        }
+
+        void KillEngineRegen(RE::StaticFunctionTag*, RE::Actor* actor) {
+            if (!actor) {
+                return;
+            }
+            auto* values = actor->AsActorValueOwner();
+            if (!values) {
+                return;
+            }
+            ForceAvTo(values, RE::ActorValue::kHealRate, 0.0f);
+            ForceAvTo(values, RE::ActorValue::kHealRateMult, 0.0f);
+        }
+
         bool Register(RE::BSScript::IVirtualMachine* vm) {
             vm->RegisterFunction("LogLine", kScript, LogLine);
             vm->RegisterFunction("LogHit", kScript, LogHit);
             vm->RegisterFunction("SetActorLevel", kScript, SetActorLevel);
             vm->RegisterFunction("SetDisplayName", kScript, SetDisplayName);
+            vm->RegisterFunction("KillEngineRegen", kScript, KillEngineRegen);
             logger::info("Registered Papyrus natives on {}", kScript);
             return true;
         }

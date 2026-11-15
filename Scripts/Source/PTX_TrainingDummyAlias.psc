@@ -183,6 +183,8 @@ Event OnUpdate()
 	EndIf
 
 	PinInPlace(dummy)
+	; SetAV HealRate is overwritten; re-force every tick so start-% HP stays put.
+	TrainingDummyUI.KillEngineRegen(dummy)
 	; CastAs / Spell aura apply effects without OnHit — catch HP drops here.
 	ReportHealthDrop(dummy, "aura/poll")
 
@@ -314,8 +316,7 @@ Function Configure()
 		level = Game.GetPlayer().GetLevel()
 		maxHp = (level as Float) * 50.0
 		startHp = maxHp
-		dummy.SetActorValue("HealRate", 0.0)
-		dummy.SetActorValue("HealRateMult", 0.0)
+		TrainingDummyUI.KillEngineRegen(dummy)
 		dummy.SetActorValue("Health", maxHp)
 		dummy.RestoreActorValue("Health", maxHp)
 	EndIf
