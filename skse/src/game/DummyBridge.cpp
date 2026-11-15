@@ -75,8 +75,8 @@ namespace tdui::game {
                 return;
             }
             CallMethod(quest, kQuestScript, "ApplyUiSettings", {}, settings.matchPlayer,
-                static_cast<std::int32_t>(settings.level), settings.healthPerLevel, settings.muteNotifications,
-                static_cast<std::int32_t>(settings.relationshipRank));
+                static_cast<std::int32_t>(settings.level), settings.healthPerLevel, settings.healthStartPercent,
+                settings.muteNotifications, static_cast<std::int32_t>(settings.relationshipRank));
         });
     }
 
@@ -90,6 +90,34 @@ namespace tdui::game {
     void DummyBridge::GiveSpells() { CallQuest("GivePlayerSpells"); }
     void DummyBridge::RemoveSpells() { CallQuest("RemovePlayerSpells"); }
     void DummyBridge::HealNow() { CallQuest("HealLiveDummies"); }
+
+    // Walk male 0..2, then female 0..2, then PlayerHasSpells.
+    void DummyBridge::FetchNextSlot(RE::TESForm* quest, std::shared_ptr<DummyStatus> st, int step) {
+        if (!quest || !st) {
+            return;
+        }
+        if (step < kMaxPerGender) {
+            CallMethod(quest, kQuestScript, "GetMaleFormID", [this, quest, st, step](const RE::BSScript::Variable& r) {
+                st->male[step] = ReadActor(static_cast<RE::FormID>(IntFromVar(r)));
+                FetchNextSlot(quest, st, step + 1);
+            }, static_cast<std::int32_t>(step));
+            return;
+        }
+        const int femaleStep = step - kMaxPerGender;
+        if (femaleStep < kMaxPerGender) {
+            CallMethod(quest, kQuestScript, "GetFemaleFormID", [this, quest, st, step, femaleStep](const RE::BSScript::Variable& r) {
+                st->female[femaleStep] = ReadActor(static_cast<RE::FormID>(IntFromVar(r)));
+                FetchNextSlot(quest, st, step + 1);
+            }, static_cast<std::int32_t>(femaleStep));
+            return;
+        }
+        CallMethod(quest, kQuestScript, "PlayerHasSpells", [this, st](const RE::BSScript::Variable& r) {
+            st->hasSpells = r.IsBool() && r.GetBool();
+            st->fresh = true;
+            std::scoped_lock lock(statusMutex_);
+            status_ = *st;
+        });
+    }
 
     void DummyBridge::RefreshStatus() {
         const auto now = std::chrono::steady_clock::now();
@@ -110,19 +138,7 @@ namespace tdui::game {
 
             auto st = std::make_shared<DummyStatus>();
             st->questLoaded = true;
-            st->fresh = true;
-
-            CallMethod(quest, kQuestScript, "GetMaleFormID", [this, st](const RE::BSScript::Variable& r) {
-                st->male = ReadActor(static_cast<RE::FormID>(IntFromVar(r)));
-                CallMethod(QuestForm(), kQuestScript, "GetFemaleFormID", [this, st](const RE::BSScript::Variable& r2) {
-                    st->female = ReadActor(static_cast<RE::FormID>(IntFromVar(r2)));
-                    CallMethod(QuestForm(), kQuestScript, "PlayerHasSpells", [this, st](const RE::BSScript::Variable& r3) {
-                        st->hasSpells = r3.IsBool() && r3.GetBool();
-                        std::scoped_lock lock(statusMutex_);
-                        status_ = *st;
-                    });
-                });
-            });
+            FetchNextSlot(quest, st, 0);
         });
     }
 }

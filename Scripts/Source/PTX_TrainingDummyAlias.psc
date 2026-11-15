@@ -283,18 +283,22 @@ Function Configure()
 	EndIf
 	Int level = 1
 	Float maxHp = 50.0
+	Float startHp = 50.0
 	If DummyQuest
 		level = DummyQuest.EffectiveLevel()
 		maxHp = DummyQuest.EffectiveMaxHealth()
+		startHp = DummyQuest.EffectiveStartHealth()
+		DummyQuest.ApplyHealth(dummy, maxHp, startHp)
 	Else
 		level = Game.GetPlayer().GetLevel()
 		maxHp = (level as Float) * 50.0
+		startHp = maxHp
+		dummy.SetActorValue("Health", maxHp)
+		dummy.RestoreActorValue("Health", maxHp)
 	EndIf
 	MaxHealth = maxHp
 	dummy.SetGhost(False)
 	HoldStill(dummy)
 	TrainingDummyUI.SetActorLevel(dummy, level)
-	dummy.SetActorValue("Health", maxHp)
-	dummy.RestoreActorValue("Health", maxHp)
-	LastHealth = maxHp
+	LastHealth = startHp
 EndFunction

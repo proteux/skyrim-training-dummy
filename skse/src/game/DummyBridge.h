@@ -6,6 +6,7 @@ namespace tdui::game {
     inline constexpr const char* kEsp = "PTX_TrainingDummy.esp";
     inline constexpr const char* kQuestScript = "PTX_TrainingDummyQuest";
     inline constexpr RE::FormID kQuestId = 0x800;
+    inline constexpr int kMaxPerGender = 3;
 
     struct DummySlotStatus {
         bool present = false;
@@ -17,8 +18,8 @@ namespace tdui::game {
     struct DummyStatus {
         bool questLoaded = false;
         bool hasSpells = false;
-        DummySlotStatus male;
-        DummySlotStatus female;
+        DummySlotStatus male[kMaxPerGender]{};
+        DummySlotStatus female[kMaxPerGender]{};
         bool fresh = false;
     };
 
@@ -44,6 +45,7 @@ namespace tdui::game {
         RE::TESForm* QuestForm() const;
         void CallQuest(const char* fn);
         void CallQuestSettings(const io::UiSettings& settings);
+        void FetchNextSlot(RE::TESForm* quest, std::shared_ptr<DummyStatus> st, int step);
 
         mutable std::mutex statusMutex_;
         DummyStatus status_;

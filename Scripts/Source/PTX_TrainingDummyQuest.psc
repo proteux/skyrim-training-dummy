@@ -1,19 +1,26 @@
 ScriptName PTX_TrainingDummyQuest extends Quest
-{Holds live male and female dummy aliases (both can exist at once).}
+{Holds up to three male and three female dummy aliases.}
 
-ReferenceAlias Property MaleAlias Auto
-ReferenceAlias Property FemaleAlias Auto
+ReferenceAlias Property MaleAlias0 Auto
+ReferenceAlias Property MaleAlias1 Auto
+ReferenceAlias Property MaleAlias2 Auto
+ReferenceAlias Property FemaleAlias0 Auto
+ReferenceAlias Property FemaleAlias1 Auto
+ReferenceAlias Property FemaleAlias2 Auto
 Spell Property SummonMaleSpell Auto
 Spell Property SummonFemaleSpell Auto
 Spell Property DismissSpell Auto
 
 Float Property SpawnDistance = 150.0 Auto
 Float Property SideOffset = 40.0 Auto
+Int Property MaxPerGender = 3 Auto
 
 ; UI / settings — health max = EffectiveLevel() * HealthPerLevel
 Bool Property MatchPlayerLevel = True Auto
 Int Property DummyLevel = 1 Auto
 Float Property HealthPerLevel = 50.0 Auto
+; Current HP as % of max on summon / settings reassert (1–100). Heal now fills to 100%.
+Float Property HealthStartPercent = 100.0 Auto
 Bool Property MuteNotifications = True Auto
 ; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) / Archnemesis also join
 ; HostileFaction (enemy only to PlayerFaction) so IsHostileToActor(player) is true
@@ -53,7 +60,41 @@ Float Function EffectiveMaxHealth()
 	Return (EffectiveLevel() as Float) * per
 EndFunction
 
-Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Bool abMuteNotifications, Int aiRelationshipRank)
+Float Function EffectiveStartHealth()
+	Float pct = HealthStartPercent
+	If pct < 1.0
+		pct = 1.0
+	ElseIf pct > 100.0
+		pct = 100.0
+	EndIf
+	Float startHp = EffectiveMaxHealth() * (pct / 100.0)
+	If startHp < 1.0
+		startHp = 1.0
+	EndIf
+	Return startHp
+EndFunction
+
+; Sets max HP, then current HP to afCurrent (clamped to max).
+Function ApplyHealth(Actor dummy, Float afMaxHp, Float afCurrent)
+	If !dummy
+		Return
+	EndIf
+	If afMaxHp < 1.0
+		afMaxHp = 1.0
+	EndIf
+	If afCurrent < 1.0
+		afCurrent = 1.0
+	ElseIf afCurrent > afMaxHp
+		afCurrent = afMaxHp
+	EndIf
+	dummy.SetActorValue("Health", afMaxHp)
+	dummy.RestoreActorValue("Health", afMaxHp)
+	If afCurrent < afMaxHp
+		dummy.DamageActorValue("Health", afMaxHp - afCurrent)
+	EndIf
+EndFunction
+
+Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abMuteNotifications, Int aiRelationshipRank)
 	MatchPlayerLevel = abMatchPlayer
 	If aiLevel < 1
 		aiLevel = 1
@@ -63,6 +104,12 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 		afHealthPerLevel = 1.0
 	EndIf
 	HealthPerLevel = afHealthPerLevel
+	If afHealthStartPercent < 1.0
+		afHealthStartPercent = 1.0
+	ElseIf afHealthStartPercent > 100.0
+		afHealthStartPercent = 100.0
+	EndIf
+	HealthStartPercent = afHealthStartPercent
 	MuteNotifications = abMuteNotifications
 	If aiRelationshipRank < -4
 		aiRelationshipRank = -4
@@ -150,12 +197,18 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 		Return
 	EndIf
 
-	ReferenceAlias slot = AliasForBase(akBase)
-	If !slot
-		Notify("Training Dummy: no alias for that base.")
+	Bool female = akBase.GetSex() == 1
+	Int slotIndex = FindFreeSlot(female)
+	If slotIndex < 0
+		Notify("Training Dummy: already have " + MaxPerGender + " of that type.")
 		Return
 	EndIf
-	ClearAlias(slot)
+
+	ReferenceAlias slot = SlotAt(female, slotIndex)
+	If !slot
+		Notify("Training Dummy: no alias for that slot.")
+		Return
+	EndIf
 
 	Actor dummy = akCaster.PlaceActorAtMe(akBase)
 	If !dummy
@@ -163,14 +216,16 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 		Return
 	EndIf
 
-	; Offset in front of the caster; male left / female right so both fit.
+	; Fan left (male) / right (female); later slots step farther out and slightly forward.
 	Float az = akCaster.GetAngleZ()
-	Float side = SideOffset
-	If akBase.GetSex() == 0
-		side = -SideOffset
+	Float sideSign = 1.0
+	If !female
+		sideSign = -1.0
 	EndIf
-	Float x = SpawnDistance * Math.Sin(az) + side * Math.Cos(az)
-	Float y = SpawnDistance * Math.Cos(az) - side * Math.Sin(az)
+	Float side = sideSign * SideOffset * (1.0 + (slotIndex as Float) * 2.0)
+	Float dist = SpawnDistance + (slotIndex as Float) * 40.0
+	Float x = dist * Math.Sin(az) + side * Math.Cos(az)
+	Float y = dist * Math.Cos(az) - side * Math.Sin(az)
 	dummy.MoveTo(akCaster, x, y, 0.0, True)
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
@@ -178,21 +233,24 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	slot.ForceRefTo(dummy)
 	ResetAliasHealthTracking(slot)
 	StartAliasPinWatch(slot, dummy)
-	; Gear comes from the NPC DefaultOutfit and any SPID / outfit distributors
-	; that match the template keywords — no script UnequipAll / forced bandit set.
 
 	Int level = EffectiveLevel()
 	Float maxHp = EffectiveMaxHealth()
+	Float startHp = EffectiveStartHealth()
 	Debug.OpenUserLog("TrainingDummy")
-	String line = "--- summon want=" + level + " get=" + dummy.GetLevel() + " hp=" + (maxHp as Int) + " base=" + akBase.GetName() + " ---"
+	String line = "--- summon want=" + level + " get=" + dummy.GetLevel() + " hp=" + (startHp as Int) + "/" + (maxHp as Int) + " base=" + akBase.GetName() + " slot=" + slotIndex + " ---"
 	Debug.TraceUser("TrainingDummy", line)
 	TrainingDummyUI.LogLine(line)
 	Notify("Training Dummy summoned.")
 EndFunction
 
 Function ClearDummy()
-	ClearAlias(MaleAlias)
-	ClearAlias(FemaleAlias)
+	Int i = 0
+	While i < MaxPerGender
+		ClearAlias(SlotAt(False, i))
+		ClearAlias(SlotAt(True, i))
+		i += 1
+	EndWhile
 	Debug.TraceUser("TrainingDummy", "--- dismiss ---")
 	TrainingDummyUI.LogLine("--- dismiss ---")
 EndFunction
@@ -213,36 +271,59 @@ Function ClearAlias(ReferenceAlias slot)
 	slot.Clear()
 EndFunction
 
-ReferenceAlias Function AliasForBase(ActorBase akBase)
-	If !akBase
+ReferenceAlias Function SlotAt(Bool abFemale, Int aiIndex)
+	If aiIndex < 0 || aiIndex >= MaxPerGender
 		Return None
 	EndIf
-	If akBase.GetSex() == 1
-		Return FemaleAlias
+	If abFemale
+		If aiIndex == 0
+			Return FemaleAlias0
+		ElseIf aiIndex == 1
+			Return FemaleAlias1
+		EndIf
+		Return FemaleAlias2
 	EndIf
-	Return MaleAlias
+	If aiIndex == 0
+		Return MaleAlias0
+	ElseIf aiIndex == 1
+		Return MaleAlias1
+	EndIf
+	Return MaleAlias2
 EndFunction
 
-; Alias OnLoad: reassert both slots that are filled.
+Int Function FindFreeSlot(Bool abFemale)
+	Int i = 0
+	While i < MaxPerGender
+		ReferenceAlias slot = SlotAt(abFemale, i)
+		If slot && !slot.GetActorReference()
+			Return i
+		EndIf
+		i += 1
+	EndWhile
+	Return -1
+EndFunction
+
+; Alias OnLoad: reassert every filled slot.
 Function ReassertLiveDummy()
-	Actor male = None
-	Actor female = None
-	If MaleAlias
-		male = MaleAlias.GetActorReference()
+	Int i = 0
+	While i < MaxPerGender
+		ReassertSlot(SlotAt(False, i))
+		ReassertSlot(SlotAt(True, i))
+		i += 1
+	EndWhile
+EndFunction
+
+Function ReassertSlot(ReferenceAlias slot)
+	If !slot
+		Return
 	EndIf
-	If FemaleAlias
-		female = FemaleAlias.GetActorReference()
+	Actor dummy = slot.GetActorReference()
+	If !dummy
+		Return
 	EndIf
-	If male
-		ConfigureDummy(male)
-		ResetAliasHealthTracking(MaleAlias)
-		StartAliasPinWatch(MaleAlias, male)
-	EndIf
-	If female
-		ConfigureDummy(female)
-		ResetAliasHealthTracking(FemaleAlias)
-		StartAliasPinWatch(FemaleAlias, female)
-	EndIf
+	ConfigureDummy(dummy)
+	ResetAliasHealthTracking(slot)
+	StartAliasPinWatch(slot, dummy)
 EndFunction
 
 Function ResetAliasHealthTracking(ReferenceAlias slot)
@@ -262,44 +343,45 @@ EndFunction
 
 Function HealLiveDummies()
 	Float maxHp = EffectiveMaxHealth()
-	If MaleAlias
-		Actor male = MaleAlias.GetActorReference()
-		If male
-			male.SetActorValue("Health", maxHp)
-			male.RestoreActorValue("Health", maxHp)
-			ResetAliasHealthTracking(MaleAlias)
-		EndIf
-	EndIf
-	If FemaleAlias
-		Actor female = FemaleAlias.GetActorReference()
-		If female
-			female.SetActorValue("Health", maxHp)
-			female.RestoreActorValue("Health", maxHp)
-			ResetAliasHealthTracking(FemaleAlias)
-		EndIf
-	EndIf
+	Int i = 0
+	While i < MaxPerGender
+		HealSlot(SlotAt(False, i), maxHp)
+		HealSlot(SlotAt(True, i), maxHp)
+		i += 1
+	EndWhile
 	String line = "--- heal now hp=" + (maxHp as Int) + " ---"
 	Debug.TraceUser("TrainingDummy", line)
 	TrainingDummyUI.LogLine(line)
 	Notify("Training Dummy healed.")
 EndFunction
 
-Int Function GetMaleFormID()
-	If !MaleAlias
-		Return 0
+Function HealSlot(ReferenceAlias slot, Float afMaxHp)
+	If !slot
+		Return
 	EndIf
-	Actor dummy = MaleAlias.GetActorReference()
-	If dummy
-		Return dummy.GetFormID()
+	Actor dummy = slot.GetActorReference()
+	If !dummy
+		Return
 	EndIf
-	Return 0
+	ApplyHealth(dummy, afMaxHp, afMaxHp)
+	ResetAliasHealthTracking(slot)
 EndFunction
 
-Int Function GetFemaleFormID()
-	If !FemaleAlias
+; UI: aiIndex 0..2 for that gender's slots.
+Int Function GetMaleFormID(Int aiIndex)
+	Return FormIDAt(False, aiIndex)
+EndFunction
+
+Int Function GetFemaleFormID(Int aiIndex)
+	Return FormIDAt(True, aiIndex)
+EndFunction
+
+Int Function FormIDAt(Bool abFemale, Int aiIndex)
+	ReferenceAlias slot = SlotAt(abFemale, aiIndex)
+	If !slot
 		Return 0
 	EndIf
-	Actor dummy = FemaleAlias.GetActorReference()
+	Actor dummy = slot.GetActorReference()
 	If dummy
 		Return dummy.GetFormID()
 	EndIf
@@ -342,14 +424,14 @@ Function ConfigureDummy(Actor dummy)
 	EndIf
 	Int level = EffectiveLevel()
 	Float maxHp = EffectiveMaxHealth()
+	Float startHp = EffectiveStartHealth()
 	dummy.SetGhost(False)
 	dummy.StopCombat()
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetRestrained(True)
 	TrainingDummyUI.SetActorLevel(dummy, level)
-	dummy.SetActorValue("Health", maxHp)
-	dummy.RestoreActorValue("Health", maxHp)
+	ApplyHealth(dummy, maxHp, startHp)
 	; No town crime faction — assault on a dummy must not bounty the player.
 	dummy.SetCrimeFaction(None)
 	Actor player = Game.GetPlayer()

@@ -55,8 +55,8 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         | NpcConfiguration.Flag.Invulnerable
         | NpcConfiguration.Flag.IsGhost
         | NpcConfiguration.Flag.Summonable);
+    // Not Unique — up to three live instances share each base (0x801 / 0x802).
     npc.Configuration.Flags |= NpcConfiguration.Flag.Essential
-        | NpcConfiguration.Flag.Unique
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
     // EncBandit templates are lv1 — keep both bases equal before runtime level.
     // Runtime TrainingDummyUI.SetActorLevel overwrites this to the UI level.
@@ -68,8 +68,8 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
     npc.Packages.Clear();
     // Keep template keywords + DefaultOutfit so SPID / outfit distributors can dress
     // them from the load order. Class is left as-duplicated for Class filters.
-    // Strip warpaint / makeup layers from the template face record.
-    npc.TintLayers?.Clear();
+    // Keep TintLayers (including skin tone) so the EncBandit head matches other bandits;
+    // clearing them left the male head untinted vs the body.
     // Match typical RaceMenu export weight so FaceGen necks line up better.
     npc.Weight = 100f;
     // Outfit on the base; clear loose Items so they don't stack with the outfit.
@@ -87,26 +87,32 @@ Npc TuneAi(Npc npc)
     return npc;
 }
 
-// --- Quest 0x800 (aliases 0=male, 1=female; both can be live at once) ---
+// --- Quest 0x800 (aliases 0-2 male, 3-5 female; up to 3 of each) ---
 var quest = new Quest(F(0x800), SkyrimRelease.SkyrimSE)
 {
     EditorID = "PTX_TrainingDummyQuest",
     Name = "Training Dummy",
     Flags = Quest.Flag.StartGameEnabled,
-    NextAliasID = 2,
+    NextAliasID = 6,
 };
-quest.Aliases.Add(new QuestAlias
+for (uint i = 0; i < 3; ++i)
 {
-    ID = 0,
-    Name = "MaleDummy",
-    Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
-});
-quest.Aliases.Add(new QuestAlias
+    quest.Aliases.Add(new QuestAlias
+    {
+        ID = i,
+        Name = $"MaleDummy{i}",
+        Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
+    });
+}
+for (uint i = 0; i < 3; ++i)
 {
-    ID = 1,
-    Name = "FemaleDummy",
-    Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
-});
+    quest.Aliases.Add(new QuestAlias
+    {
+        ID = 3 + i,
+        Name = $"FemaleDummy{i}",
+        Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
+    });
+}
 
 var questAdapter = new QuestAdapter { Version = 5, ObjectFormat = 2 };
 var questScript = new ScriptEntry
@@ -114,20 +120,22 @@ var questScript = new ScriptEntry
     Name = "PTX_TrainingDummyQuest",
     Flags = ScriptEntry.Flag.Local,
 };
-questScript.Properties.Add(new ScriptObjectProperty
+void AddAliasProp(string name, int aliasId)
 {
-    Name = "MaleAlias",
-    Flags = ScriptProperty.Flag.Edited,
-    Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
-    Alias = 0,
-});
-questScript.Properties.Add(new ScriptObjectProperty
-{
-    Name = "FemaleAlias",
-    Flags = ScriptProperty.Flag.Edited,
-    Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
-    Alias = 1,
-});
+    questScript.Properties.Add(new ScriptObjectProperty
+    {
+        Name = name,
+        Flags = ScriptProperty.Flag.Edited,
+        Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+        Alias = (short)aliasId,
+    });
+}
+AddAliasProp("MaleAlias0", 0);
+AddAliasProp("MaleAlias1", 1);
+AddAliasProp("MaleAlias2", 2);
+AddAliasProp("FemaleAlias0", 3);
+AddAliasProp("FemaleAlias1", 4);
+AddAliasProp("FemaleAlias2", 5);
 questAdapter.Scripts.Add(questScript);
 
 QuestFragmentAlias MakeAliasFrag(int aliasId)
@@ -155,8 +163,10 @@ QuestFragmentAlias MakeAliasFrag(int aliasId)
     frag.Scripts.Add(script);
     return frag;
 }
-questAdapter.Aliases.Add(MakeAliasFrag(0));
-questAdapter.Aliases.Add(MakeAliasFrag(1));
+for (int i = 0; i < 6; ++i)
+{
+    questAdapter.Aliases.Add(MakeAliasFrag(i));
+}
 quest.VirtualMachineAdapter = questAdapter;
 mod.Quests.Add(quest);
 

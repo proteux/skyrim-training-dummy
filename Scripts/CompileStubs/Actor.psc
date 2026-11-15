@@ -8,6 +8,7 @@ Function SetRestrained(Bool abRestrained) native
 Function StopCombat() native
 Function SetActorValue(String asValueName, Float afValue) native
 Function RestoreActorValue(String asValueName, Float afAmount) native
+Function DamageActorValue(String asValueName, Float afAmount) native
 Float Function GetActorValue(String asValueName) native
 Int Function GetLevel() native
 Bool Function HasSpell(Form akForm) native

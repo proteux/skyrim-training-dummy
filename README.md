@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Female uses a RaceMenu FaceGen head; male keeps the EncBandit default head (skin matches the body). Both keep the template outfit / keywords so SPID and outfit distributors can dress them. One of each can be out at the same time.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Female uses a RaceMenu FaceGen head; male keeps the EncBandit default head (skin matches the body). Both keep the template outfit / keywords so SPID and outfit distributors can dress them. Up to three of each gender can be out at the same time.
 
 ## Requirements
 
@@ -20,8 +20,8 @@ Needs `VCPKG_ROOT` set (same toolchain as Magic Tattoos UI). Enable `PTX_Trainin
 
 ### Spells
 
-- **Summon Male / Female Training Dummy** — places the dummy in front of you. Replacing summons only that gender.
-- **Dismiss Training Dummy** — removes both.
+- **Summon Male / Female Training Dummy** — places another dummy in front of you (up to 3 per gender; refuses when full).
+- **Dismiss Training Dummy** — removes all live dummies.
 
 ### SKSE UI
 
@@ -30,6 +30,7 @@ Open the Mod Control Panel (default hotkey from Menu Framework) → **Training D
 - Summon / dismiss / heal now (add or remove spells from the Mod Control Panel section)
 - **Match player level** (default on), or set a fixed level — under **Summon settings** in the standalone window
 - **Health per level** (default **50**): max HP = level × this
+- **Start at % HP** (default **100**): current HP on summon / when settings reapply; use a lower value to test healing auras. **Heal now** still fills to 100%
 - **vs player** relationship (default Lover): set **Enemy** or **Archnemesis** so harmful Spell auras hit them (custom faction enemy to the player; needs MTF Plugin - Skyrim 0.3.3+, which also checks faction reaction). Hitting or hexing a dummy does not report as assault, so town guards stay out of it; dummies stay Unaggressive. Spell aura damage is logged even without a weapon/spell OnHit.
 - Rolling combat log with 5s / 10s DPS, clear, and copy to clipboard
 - Hit notifications stay muted by default (hits still go to the log; change `muteNotifications` in settings.json if needed)

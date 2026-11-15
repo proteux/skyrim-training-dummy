@@ -12,10 +12,24 @@ namespace tdui::ui {
 
         void SlotLine(const char* label, const game::DummySlotStatus& slot) {
             if (!slot.present) {
-                TextDisabled("%s: not summoned", label);
+                TextDisabled("%s: empty", label);
                 return;
             }
             Text("%s: lv %d  HP %.0f / %.0f", label, slot.level, slot.health, slot.maxHealth);
+        }
+
+        void GenderSlots(const char* gender, const game::DummySlotStatus (&slots)[game::kMaxPerGender]) {
+            int live = 0;
+            for (const auto& s : slots) {
+                if (s.present) {
+                    ++live;
+                }
+            }
+            Text("%s (%d/%d)", gender, live, game::kMaxPerGender);
+            for (int i = 0; i < game::kMaxPerGender; ++i) {
+                const auto label = std::format("  #{}", i + 1);
+                SlotLine(label.c_str(), slots[i]);
+            }
         }
     }
 
@@ -157,11 +171,18 @@ namespace tdui::ui {
             settingsDirty = true;
         }
 
+        SetNextItemWidth(180);
+        SliderFloat("Start at % HP", &settings_.healthStartPercent, 1.0f, 100.0f, "%.0f%%");
+        if (IsItemDeactivatedAfterEdit()) {
+            settingsDirty = true;
+        }
+
         if (settings_.matchPlayer) {
-            TextDisabled("Max HP = player level x %.0f", settings_.healthPerLevel);
+            TextDisabled("Max HP = player level x %.0f; start at %.0f%%", settings_.healthPerLevel,
+                settings_.healthStartPercent);
         } else {
-            TextDisabled("Max HP = %d x %.0f = %.0f", settings_.level, settings_.healthPerLevel,
-                settings_.level * settings_.healthPerLevel);
+            TextDisabled("Max HP = %d x %.0f = %.0f; start at %.0f%%", settings_.level, settings_.healthPerLevel,
+                settings_.level * settings_.healthPerLevel, settings_.healthStartPercent);
         }
 
         // Ranks match Actor.SetRelationshipRank / the Creation Kit.
@@ -195,6 +216,7 @@ namespace tdui::ui {
         if (settingsDirty) {
             settings_.level = std::clamp(settings_.level, 1, 1000);
             settings_.healthPerLevel = std::clamp(settings_.healthPerLevel, 1.0f, 10000.0f);
+            settings_.healthStartPercent = std::clamp(settings_.healthStartPercent, 1.0f, 100.0f);
             settings_.relationshipRank = std::clamp(settings_.relationshipRank, -4, 3);
             SaveSettings();
             PushSettingsToGame();
@@ -207,8 +229,8 @@ namespace tdui::ui {
             TextColored(kWarn, "PTX_TrainingDummy.esp quest not loaded");
             return;
         }
-        SlotLine("Male", st.male);
-        SlotLine("Female", st.female);
+        GenderSlots("Male", st.male);
+        GenderSlots("Female", st.female);
 
         const float d5 = game::CombatLog::Get().DamageIn(5s);
         const float d10 = game::CombatLog::Get().DamageIn(10s);
