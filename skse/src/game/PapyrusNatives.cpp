@@ -31,8 +31,8 @@ namespace tdui::game {
                 logger::warn("SetActorLevel: no actor base for {:08X}", actor->GetFormID());
                 return;
             }
-            // Fixed level (not PC×mult). Unique dummy bases are safe to mutate;
-            // only one male / female instance uses each FormID.
+            // Fixed level (not PC×mult). Bases are shared by up to 3 instances each;
+            // mutating level on the ActorBase is intentional for these dummy FormIDs.
             npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kPCLevelMult);
             npc->actorData.level = static_cast<std::uint16_t>(level);
             npc->actorData.calcLevelMin = 0;

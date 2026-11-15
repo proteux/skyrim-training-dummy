@@ -68,13 +68,35 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
     npc.Packages.Clear();
     // Keep template keywords + DefaultOutfit so SPID / outfit distributors can dress
     // them from the load order. Class is left as-duplicated for Class filters.
-    // Keep TintLayers (including skin tone) so the EncBandit head matches other bandits;
-    // clearing them left the male head untinted vs the body.
+    KeepSkinToneTintsOnly(npc);
     // Match typical RaceMenu export weight so FaceGen necks line up better.
     npc.Weight = 100f;
     // Outfit on the base; clear loose Items so they don't stack with the outfit.
     npc.Items?.Clear();
     return npc;
+}
+
+// Drop dirt / warpaint / makeup; keep race SkinTone so the EncBandit head
+// still matches other bandits (and our body) instead of going untinted.
+void KeepSkinToneTintsOnly(Npc npc)
+{
+    if (npc.TintLayers is not { Count: > 0 } layers)
+        return;
+
+    var race = skyrimMod.Races.FirstOrDefault(r => r.FormKey == npc.Race.FormKey)
+        ?? throw new InvalidOperationException($"Missing race {npc.Race.FormKey} for tint filter.");
+    var female = npc.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female);
+    var head = female ? race.HeadData?.Female : race.HeadData?.Male;
+    if (head is null)
+        return;
+
+    var skinIndexes = head.TintMasks
+        .Where(m => m.MaskType == TintAssets.TintMaskType.SkinTone && m.Index is not null)
+        .Select(m => m.Index!.Value)
+        .ToHashSet();
+    var before = layers.Count;
+    layers.RemoveAll(l => l.Index is not { } idx || !skinIndexes.Contains(idx));
+    Console.WriteLine($"  tint filter {npc.EditorID}: {before} -> {layers.Count} (kept SkinTone only)");
 }
 
 Npc TuneAi(Npc npc)

@@ -53,6 +53,11 @@ namespace {
                 logger::critical("Training Dummy UI failed to start: {}", e.what());
             }
             break;
+        case SKSE::MessagingInterface::kNewGame:
+        case SKSE::MessagingInterface::kPostLoadGame:
+            // Save restore can overwrite quest Auto properties after kDataLoaded.
+            tdui::ui::App::Get().PushSettingsToGame();
+            break;
         default:
             break;
         }

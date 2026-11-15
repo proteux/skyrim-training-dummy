@@ -18,6 +18,7 @@ namespace tdui::ui {
         void DrawWindow();
 
         void SaveSettings();
+        void PushSettingsToGame();
 
     private:
         void BeginFrame();
@@ -25,7 +26,6 @@ namespace tdui::ui {
         void DrawSummonSettings();
         void DrawStatus();
         void DrawLog();
-        void PushSettingsToGame();
 
         io::UiSettings settings_;
         std::filesystem::path settingsPath_;

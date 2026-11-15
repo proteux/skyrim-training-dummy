@@ -45,10 +45,15 @@ namespace tdui::game {
         RE::TESForm* QuestForm() const;
         void CallQuest(const char* fn);
         void CallQuestSettings(const io::UiSettings& settings);
+        void SummonAfterSettings(const char* fn);
         void FetchNextSlot(RE::TESForm* quest, std::shared_ptr<DummyStatus> st, int step);
 
         mutable std::mutex statusMutex_;
         DummyStatus status_;
         std::chrono::steady_clock::time_point lastStatus_{};
+
+        mutable std::mutex settingsMutex_;
+        io::UiSettings lastSettings_{};
+        bool hasSettings_ = false;
     };
 }

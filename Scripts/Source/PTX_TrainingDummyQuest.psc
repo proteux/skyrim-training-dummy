@@ -14,6 +14,13 @@ Spell Property DismissSpell Auto
 Float Property SpawnDistance = 150.0 Auto
 Float Property SideOffset = 40.0 Auto
 Int Property MaxPerGender = 3 Auto
+; Claimed during PlaceActorAtMe so rapid summons cannot pick the same free slot.
+Bool MaleReserving0 = False
+Bool MaleReserving1 = False
+Bool MaleReserving2 = False
+Bool FemaleReserving0 = False
+Bool FemaleReserving1 = False
+Bool FemaleReserving2 = False
 
 ; UI / settings — health max = EffectiveLevel() * HealthPerLevel
 Bool Property MatchPlayerLevel = True Auto
@@ -75,6 +82,7 @@ Float Function EffectiveStartHealth()
 EndFunction
 
 ; Sets max HP, then current HP to afCurrent (clamped to max).
+; Also kills engine HealRate so Start at % HP stays put until real heals/damage.
 Function ApplyHealth(Actor dummy, Float afMaxHp, Float afCurrent)
 	If !dummy
 		Return
@@ -87,6 +95,8 @@ Function ApplyHealth(Actor dummy, Float afMaxHp, Float afCurrent)
 	ElseIf afCurrent > afMaxHp
 		afCurrent = afMaxHp
 	EndIf
+	dummy.SetActorValue("HealRate", 0.0)
+	dummy.SetActorValue("HealRateMult", 0.0)
 	dummy.SetActorValue("Health", afMaxHp)
 	dummy.RestoreActorValue("Health", afMaxHp)
 	If afCurrent < afMaxHp
@@ -94,7 +104,9 @@ Function ApplyHealth(Actor dummy, Float afMaxHp, Float afCurrent)
 	EndIf
 EndFunction
 
-Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abMuteNotifications, Int aiRelationshipRank)
+; abReassert: True when the user changed settings (snap live dummies). False when
+; only priming properties before a summon so damaged dummies are left alone.
+Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abMuteNotifications, Int aiRelationshipRank, Bool abReassert = True)
 	MatchPlayerLevel = abMatchPlayer
 	If aiLevel < 1
 		aiLevel = 1
@@ -117,7 +129,9 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 		aiRelationshipRank = 3
 	EndIf
 	RelationshipRank = aiRelationshipRank
-	ReassertLiveDummy()
+	If abReassert
+		ReassertLiveDummy()
+	EndIf
 EndFunction
 
 ; Spells once per character. Safe to call again after a load.
@@ -206,15 +220,22 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 
 	ReferenceAlias slot = SlotAt(female, slotIndex)
 	If !slot
+		SetSlotReserved(female, slotIndex, False)
 		Notify("Training Dummy: no alias for that slot.")
 		Return
 	EndIf
 
 	Actor dummy = akCaster.PlaceActorAtMe(akBase)
 	If !dummy
+		SetSlotReserved(female, slotIndex, False)
 		Notify("Training Dummy: PlaceActorAtMe failed.")
 		Return
 	EndIf
+
+	; Claim the alias before MoveTo / Configure so a parallel summon cannot reuse it,
+	; and so pin/heal tracking attaches even if later steps hitch.
+	slot.ForceRefTo(dummy)
+	SetSlotReserved(female, slotIndex, False)
 
 	; Fan left (male) / right (female); later slots step farther out and slightly forward.
 	Float az = akCaster.GetAngleZ()
@@ -230,7 +251,6 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
 	ConfigureDummy(dummy)
-	slot.ForceRefTo(dummy)
 	ResetAliasHealthTracking(slot)
 	StartAliasPinWatch(slot, dummy)
 
@@ -291,11 +311,53 @@ ReferenceAlias Function SlotAt(Bool abFemale, Int aiIndex)
 	Return MaleAlias2
 EndFunction
 
+Bool Function IsSlotReserved(Bool abFemale, Int aiIndex)
+	If abFemale
+		If aiIndex == 0
+			Return FemaleReserving0
+		ElseIf aiIndex == 1
+			Return FemaleReserving1
+		ElseIf aiIndex == 2
+			Return FemaleReserving2
+		EndIf
+		Return False
+	EndIf
+	If aiIndex == 0
+		Return MaleReserving0
+	ElseIf aiIndex == 1
+		Return MaleReserving1
+	ElseIf aiIndex == 2
+		Return MaleReserving2
+	EndIf
+	Return False
+EndFunction
+
+Function SetSlotReserved(Bool abFemale, Int aiIndex, Bool abBusy)
+	If abFemale
+		If aiIndex == 0
+			FemaleReserving0 = abBusy
+		ElseIf aiIndex == 1
+			FemaleReserving1 = abBusy
+		ElseIf aiIndex == 2
+			FemaleReserving2 = abBusy
+		EndIf
+		Return
+	EndIf
+	If aiIndex == 0
+		MaleReserving0 = abBusy
+	ElseIf aiIndex == 1
+		MaleReserving1 = abBusy
+	ElseIf aiIndex == 2
+		MaleReserving2 = abBusy
+	EndIf
+EndFunction
+
 Int Function FindFreeSlot(Bool abFemale)
 	Int i = 0
 	While i < MaxPerGender
 		ReferenceAlias slot = SlotAt(abFemale, i)
-		If slot && !slot.GetActorReference()
+		If slot && !slot.GetActorReference() && !IsSlotReserved(abFemale, i)
+			SetSlotReserved(abFemale, i, True)
 			Return i
 		EndIf
 		i += 1
@@ -303,7 +365,7 @@ Int Function FindFreeSlot(Bool abFemale)
 	Return -1
 EndFunction
 
-; Alias OnLoad: reassert every filled slot.
+; Settings / cell return: reassert every filled slot.
 Function ReassertLiveDummy()
 	Int i = 0
 	While i < MaxPerGender
@@ -313,6 +375,7 @@ Function ReassertLiveDummy()
 	EndWhile
 EndFunction
 
+; Alias OnLoad should only touch itself — reasserting every slot mid-summon races.
 Function ReassertSlot(ReferenceAlias slot)
 	If !slot
 		Return

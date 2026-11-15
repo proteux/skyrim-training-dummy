@@ -10,25 +10,21 @@ namespace tdui::ui {
     namespace {
         constexpr ImVec4 kWarn{ 0.95f, 0.75f, 0.30f, 1.0f };
 
-        void SlotLine(const char* label, const game::DummySlotStatus& slot) {
-            if (!slot.present) {
-                TextDisabled("%s: empty", label);
-                return;
+        void SlotCell(const game::DummySlotStatus& s) {
+            if (s.present) {
+                Text("%.0f / %.0f", s.health, s.maxHealth);
+            } else {
+                TextDisabled("%s", "-");
             }
-            Text("%s: lv %d  HP %.0f / %.0f", label, slot.level, slot.health, slot.maxHealth);
         }
 
-        void GenderSlots(const char* gender, const game::DummySlotStatus (&slots)[game::kMaxPerGender]) {
-            int live = 0;
+        void GenderRow(const char* gender, const game::DummySlotStatus (&slots)[game::kMaxPerGender]) {
+            TableNextRow();
+            TableNextColumn();
+            TextUnformatted(gender);
             for (const auto& s : slots) {
-                if (s.present) {
-                    ++live;
-                }
-            }
-            Text("%s (%d/%d)", gender, live, game::kMaxPerGender);
-            for (int i = 0; i < game::kMaxPerGender; ++i) {
-                const auto label = std::format("  #{}", i + 1);
-                SlotLine(label.c_str(), slots[i]);
+                TableNextColumn();
+                SlotCell(s);
             }
         }
     }
@@ -229,8 +225,16 @@ namespace tdui::ui {
             TextColored(kWarn, "PTX_TrainingDummy.esp quest not loaded");
             return;
         }
-        GenderSlots("Male", st.male);
-        GenderSlots("Female", st.female);
+        if (BeginTable("##slots", 4,
+                ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchSame)) {
+            TableSetupColumn("##g", ImGuiTableColumnFlags_WidthFixed, 24.0f);
+            TableSetupColumn("##0");
+            TableSetupColumn("##1");
+            TableSetupColumn("##2");
+            GenderRow("M", st.male);
+            GenderRow("F", st.female);
+            EndTable();
+        }
 
         const float d5 = game::CombatLog::Get().DamageIn(5s);
         const float d10 = game::CombatLog::Get().DamageIn(10s);

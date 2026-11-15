@@ -55,10 +55,13 @@ Function EnsurePinWatch(Actor dummy = None)
 		RememberAnchor(dummy)
 	EndIf
 	PinInPlace(dummy)
-	If !PinWatchActive
-		PinWatchActive = True
-		RegisterForSingleUpdate(PinInterval)
+	; Always (re)register — PinWatchActive can be true after a lost SingleUpdate.
+	PinWatchActive = True
+	Float interval = PinInterval
+	If interval < 0.1
+		interval = 0.1
 	EndIf
+	RegisterForSingleUpdate(interval)
 EndFunction
 
 Function StopPinWatch()
@@ -81,8 +84,9 @@ Function RememberAnchor(Actor dummy)
 EndFunction
 
 Event OnLoad()
+	; Only this alias — ReassertLiveDummy() during rapid summons stomped sibling pins.
 	If DummyQuest
-		DummyQuest.ReassertLiveDummy()
+		DummyQuest.ReassertSlot(Self as ReferenceAlias)
 	Else
 		Configure()
 	EndIf
@@ -293,6 +297,8 @@ Function Configure()
 		level = Game.GetPlayer().GetLevel()
 		maxHp = (level as Float) * 50.0
 		startHp = maxHp
+		dummy.SetActorValue("HealRate", 0.0)
+		dummy.SetActorValue("HealRateMult", 0.0)
 		dummy.SetActorValue("Health", maxHp)
 		dummy.RestoreActorValue("Health", maxHp)
 	EndIf
