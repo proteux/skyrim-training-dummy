@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Male base is Alvor; female is EncBandit Nord. Both use RaceMenu FaceGen heads and keep the template outfit / keywords so SPID and outfit distributors can dress them. One of each can be out at the same time.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Both use RaceMenu FaceGen heads and keep the template outfit / keywords so SPID and outfit distributors can dress them. One of each can be out at the same time.
 
 ## Requirements
 
@@ -27,12 +27,12 @@ Needs `VCPKG_ROOT` set (same toolchain as Magic Tattoos UI). Enable `PTX_Trainin
 
 Open the Mod Control Panel (default hotkey from Menu Framework) → **Training Dummy**, or open the standalone window from the section.
 
-- Summon / dismiss / add or remove spells / heal now
-- **Match player level** (default on), or set a fixed level
+- Summon / dismiss / heal now (add or remove spells from the Mod Control Panel section)
+- **Match player level** (default on), or set a fixed level — under **Summon settings** in the standalone window
 - **Health per level** (default **50**): max HP = level × this
-- **vs player** relationship (default Lover): set **Enemy** or **Archnemesis** so harmful Spell auras hit them (`IsHostileToActor` via a custom faction that’s only enemy to the player). Hitting or hexing a dummy does not report as assault, so town guards stay out of it; dummies stay Unaggressive.
-- Rolling combat log with 5s / 10s DPS
-- Mute hit notifications (default on; hits still go to the log)
+- **vs player** relationship (default Lover): set **Enemy** or **Archnemesis** so harmful Spell auras hit them (custom faction enemy to the player; needs MTF Plugin - Skyrim 0.3.3+, which also checks faction reaction). Hitting or hexing a dummy does not report as assault, so town guards stay out of it; dummies stay Unaggressive. Spell aura damage is logged even without a weapon/spell OnHit.
+- Rolling combat log with 5s / 10s DPS, clear, and copy to clipboard
+- Hit notifications stay muted by default (hits still go to the log; change `muteNotifications` in settings.json if needed)
 
 Settings: `Data/SKSE/Plugins/TrainingDummyUI/settings.json`. Changing **Pause game while window open** needs a Skyrim restart (registration-time flag).
 
@@ -44,7 +44,7 @@ SKSE plugin log:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/TrainingDummyUI.log`
 
-The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Gear comes from the NPC `DefaultOutfit` plus whatever SPID / outfit distributors match; factions stay script-controlled so guards stay out. With **Enemy** or **Archnemesis**, harmful MTF Spell auras that check `IsHostileToActor` hit them; other ranks stay friendly for blessing-style tests.
+The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Gear comes from the NPC `DefaultOutfit` plus whatever SPID / outfit distributors match; factions stay script-controlled so guards stay out. With **Enemy** or **Archnemesis**, harmful MTF Spell auras that check faction enmity hit them; other ranks stay friendly for blessing-style tests.
 
 ## Faces
 

@@ -171,6 +171,8 @@ Event OnUpdate()
 	EndIf
 
 	PinInPlace(dummy)
+	; CastAs / Spell aura apply effects without OnHit — catch HP drops here.
+	ReportHealthDrop(dummy, "aura/poll")
 
 	If WatchingCombat
 		Float idleFor = Utility.GetCurrentRealTime() - LastDamageRealTime
@@ -199,6 +201,33 @@ Event OnUpdate()
 		RegisterForSingleUpdate(interval)
 	EndIf
 EndEvent
+
+; Logs damage when health falls without an OnHit (Spell aura CastAs path).
+Function ReportHealthDrop(Actor dummy, String sourceName)
+	If !dummy
+		Return
+	EndIf
+	Float remaining = dummy.GetActorValue("Health")
+	Float damage = LastHealth - remaining
+	If damage < 0.5
+		; Heal / restore — keep the tracker current without a "hit".
+		If remaining > LastHealth
+			LastHealth = remaining
+		EndIf
+		Return
+	EndIf
+	LastHealth = remaining
+	Int dmgInt = damage as Int
+	String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=?"
+	Debug.TraceUser("TrainingDummy", line)
+	TrainingDummyUI.LogHit(damage, line)
+	If DummyQuest
+		DummyQuest.Notify("Dummy hit: " + dmgInt + " dmg")
+	Else
+		Debug.Notification("Dummy hit: " + dmgInt + " dmg")
+	EndIf
+	NoteDamage()
+EndFunction
 
 ; Pin without breaking combat — restrained stops the run-in-place.
 ; Snap back if combat packages shoved them off the spawn spot.

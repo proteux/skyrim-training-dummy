@@ -1,5 +1,5 @@
 // Generates PTX_TrainingDummy.esp (light plugin):
-// quest+alias, male/female civilian Nord NPCs, self-cast summon/dismiss spells.
+// quest+alias, male/female EncBandit Nord NPCs, self-cast summon/dismiss spells.
 // FormIDs 0x800 up. Masters: Skyrim.esm only.
 //
 // Usage: PluginGen --out <path/To/PTX_TrainingDummy.esp>
@@ -58,7 +58,7 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
     npc.Configuration.Flags |= NpcConfiguration.Flag.Essential
         | NpcConfiguration.Flag.Unique
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
-    // Alvor is fixed lv10, EncBandit lv1 — normalize so both start equal.
+    // EncBandit templates are lv1 — keep both bases equal before runtime level.
     // Runtime TrainingDummyUI.SetActorLevel overwrites this to the UI level.
     npc.Configuration.Level = new NpcLevel { Level = 1 };
     npc.Configuration.CalcMinLevel = 0;
@@ -207,10 +207,10 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 // --- NPCs 0x801 / 0x802 ---
-// Male: civilian Nord (Alvor). Female: EncBandit Nord — CBBE/naked body path
-// works; Ysolda-unique clones went solid black when undressed. FaceGen heads
-// still come from CharGen Male_Dummy / Female_Dummy.
-var maleNpc = TuneAi(MakeDummy("Alvor", F(0x801), "PTX_TrainingDummyMale"));
+// Both: EncBandit Nord — generic leveled bases so naked/body morph paths work
+// (unique named clones like Alvor/Ysolda went solid black when undressed).
+// FaceGen heads still come from CharGen Male_Dummy / Female_Dummy.
+var maleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale"));
 var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
 mod.Npcs.Add(maleNpc);
 mod.Npcs.Add(femaleNpc);
@@ -367,7 +367,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 mod.ModHeader.Author = "proteux";
-mod.ModHeader.Description = "Personal immortal training dummies (Alvor male / bandit-Nord female + RaceMenu FaceGen).";
+mod.ModHeader.Description = "Personal immortal training dummies (EncBandit Nord male/female + RaceMenu FaceGen).";
 mod.ModHeader.MasterReferences.Clear();
 mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
 mod.IsSmallMaster = true;

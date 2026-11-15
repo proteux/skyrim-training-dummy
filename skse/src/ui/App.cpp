@@ -8,8 +8,6 @@ namespace tdui::ui {
     using namespace ImGuiMCP;
 
     namespace {
-        constexpr ImVec4 kMuted{ 0.65f, 0.65f, 0.65f, 1.0f };
-        constexpr ImVec4 kGood{ 0.45f, 0.85f, 0.45f, 1.0f };
         constexpr ImVec4 kWarn{ 0.95f, 0.75f, 0.30f, 1.0f };
 
         void SlotLine(const char* label, const game::DummySlotStatus& slot) {
@@ -75,7 +73,7 @@ namespace tdui::ui {
             }
         }
         Separator();
-        DrawControls();
+        DrawControls(false);
         Separator();
         DrawStatus();
         Separator();
@@ -90,7 +88,7 @@ namespace tdui::ui {
         bool open = true;
         SetNextWindowSize(ImVec2{ 520, 640 }, ImGuiCond_FirstUseEver);
         if (Begin("Training Dummy", &open)) {
-            DrawControls();
+            DrawControls(true);
             Separator();
             DrawStatus();
             Separator();
@@ -102,7 +100,7 @@ namespace tdui::ui {
         }
     }
 
-    void App::DrawControls() {
+    void App::DrawControls(bool windowMode) {
         auto& bridge = game::DummyBridge::Get();
 
         if (Button("Summon Male")) {
@@ -116,20 +114,31 @@ namespace tdui::ui {
         if (Button("Dismiss")) {
             bridge.Dismiss();
         }
-
-        if (Button("Add spells")) {
-            bridge.GiveSpells();
-        }
-        SameLine();
-        if (Button("Remove spells")) {
-            bridge.RemoveSpells();
-        }
         SameLine();
         if (Button("Heal now")) {
             bridge.HealNow();
         }
 
+        if (!windowMode) {
+            if (Button("Add spells")) {
+                bridge.GiveSpells();
+            }
+            SameLine();
+            if (Button("Remove spells")) {
+                bridge.RemoveSpells();
+            }
+            Spacing();
+            DrawSummonSettings();
+            return;
+        }
+
         Spacing();
+        if (CollapsingHeader("Summon settings")) {
+            DrawSummonSettings();
+        }
+    }
+
+    void App::DrawSummonSettings() {
         bool settingsDirty = false;
         if (Checkbox("Match player level", &settings_.matchPlayer)) {
             settingsDirty = true;
@@ -181,11 +190,7 @@ namespace tdui::ui {
             }
             EndCombo();
         }
-        TextDisabled("Enemy / Archnemesis: player-hostile faction so Spell auras hit them.");
-
-        if (Checkbox("Mute hit notifications", &settings_.muteNotifications)) {
-            settingsDirty = true;
-        }
+        TextDisabled("Enemy / Archnemesis: faction-enemy to player so Spell auras hit them.");
 
         if (settingsDirty) {
             settings_.level = std::clamp(settings_.level, 1, 1000);
@@ -202,9 +207,6 @@ namespace tdui::ui {
             TextColored(kWarn, "PTX_TrainingDummy.esp quest not loaded");
             return;
         }
-        TextColored(kGood, "Quest loaded");
-        SameLine();
-        TextDisabled(st.hasSpells ? "spells on player" : "spells not on player");
         SlotLine("Male", st.male);
         SlotLine("Female", st.female);
 
@@ -217,6 +219,17 @@ namespace tdui::ui {
         if (Button("Clear log")) {
             game::CombatLog::Get().Clear();
             lastLogCount_ = 0;
+        }
+        SameLine();
+        if (Button("Copy to clipboard")) {
+            const auto lines = game::CombatLog::Get().Snapshot();
+            std::string text;
+            text.reserve(lines.size() * 48);
+            for (const auto& e : lines) {
+                text += e.line;
+                text += '\n';
+            }
+            SetClipboardText(text.c_str());
         }
         SameLine();
         Checkbox("Auto-scroll", &autoScroll_);

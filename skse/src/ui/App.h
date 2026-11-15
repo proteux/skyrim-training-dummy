@@ -21,7 +21,8 @@ namespace tdui::ui {
 
     private:
         void BeginFrame();
-        void DrawControls();
+        void DrawControls(bool windowMode);
+        void DrawSummonSettings();
         void DrawStatus();
         void DrawLog();
         void PushSettingsToGame();
