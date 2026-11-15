@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal, non-hostile, matches the player level. Male and female bandit looks. At most one in the world.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal, non-hostile, matches the player level. Male/female bases are civilian Nords (Alvor / Ysolda clones); they still spawn in bandit gear for a combat dummy look. One of each can be out at the same time; summoning again replaces only that gender.
 
 ## Requirements
 
@@ -18,8 +18,8 @@ Enable `PTX_TrainingDummy.esp` in Vortex (F5 if it is not listed). Restart Skyri
 ## Use
 
 - **Summon Male Training Dummy** — cast on yourself; places the dummy in front of you, facing you. Replaces any existing dummy.
-- **Summon Female Training Dummy** — same, female bandit.
-- **Dismiss Training Dummy** — removes the current dummy.
+- **Summon Female Training Dummy** — same, female.
+- **Dismiss Training Dummy** — removes both dummies.
 
 The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit), so you can pickpocket it off or reverse-pickpocket new clothes on. Undress the chest to see body tattoos. Keywords are cleared so outfit distributors (e.g. SPID) do not force unpickable armor onto them.
 
@@ -42,4 +42,4 @@ RaceMenu CharGen export lives in the repo as FaceGen for `PTX_TrainingDummyFemal
 
 ## Build notes
 
-Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen reads `Skyrim.esm` to clone the bandit templates.
+Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen clones Alvor / Ysolda from `Skyrim.esm`, then clears factions, tint layers, and outfits.

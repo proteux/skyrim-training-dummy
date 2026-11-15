@@ -1,12 +1,14 @@
 ScriptName PTX_TrainingDummyQuest extends Quest
-{Holds the live dummy alias and spawns/clears it.}
+{Holds live male and female dummy aliases (both can exist at once).}
 
-ReferenceAlias Property DummyAlias Auto
+ReferenceAlias Property MaleAlias Auto
+ReferenceAlias Property FemaleAlias Auto
 Spell Property SummonMaleSpell Auto
 Spell Property SummonFemaleSpell Auto
 Spell Property DismissSpell Auto
 
 Float Property SpawnDistance = 150.0 Auto
+Float Property SideOffset = 40.0 Auto
 
 Event OnInit()
 	RegisterForSingleUpdate(2.0)
@@ -39,7 +41,13 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	If !akCaster || !akBase
 		Return
 	EndIf
-	ClearDummy()
+
+	ReferenceAlias slot = AliasForBase(akBase)
+	If !slot
+		Debug.Notification("Training Dummy: no alias for that base.")
+		Return
+	EndIf
+	ClearAlias(slot)
 
 	Actor dummy = akCaster.PlaceActorAtMe(akBase)
 	If !dummy
@@ -47,18 +55,20 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 		Return
 	EndIf
 
-	; Offset in front of the caster (Skyrim angles are degrees; 0 faces +Y).
+	; Offset in front of the caster; male left / female right so both fit.
 	Float az = akCaster.GetAngleZ()
-	Float x = SpawnDistance * Math.Sin(az)
-	Float y = SpawnDistance * Math.Cos(az)
+	Float side = SideOffset
+	If akBase.GetSex() == 0
+		side = -SideOffset
+	EndIf
+	Float x = SpawnDistance * Math.Sin(az) + side * Math.Cos(az)
+	Float y = SpawnDistance * Math.Cos(az) - side * Math.Sin(az)
 	dummy.MoveTo(akCaster, x, y, 0.0, True)
-	; Face the player (MoveTo matched caster yaw).
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
 	ConfigureDummy(dummy)
-	DummyAlias.ForceRefTo(dummy)
+	slot.ForceRefTo(dummy)
 
-	; Equip after a beat so 3D is ready; strip anything SPID/outfit forced on first.
 	Utility.Wait(0.25)
 	GiveStartingGear(dummy)
 
@@ -68,20 +78,48 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 EndFunction
 
 Function ClearDummy()
-	Actor dummy = DummyAlias.GetActorReference()
+	ClearAlias(MaleAlias)
+	ClearAlias(FemaleAlias)
+	Debug.TraceUser("TrainingDummy", "--- dismiss ---")
+EndFunction
+
+Function ClearAlias(ReferenceAlias slot)
+	If !slot
+		Return
+	EndIf
+	Actor dummy = slot.GetActorReference()
 	If dummy
-		Debug.TraceUser("TrainingDummy", "--- dismiss ---")
 		dummy.Disable()
 		dummy.Delete()
 	EndIf
-	DummyAlias.Clear()
+	slot.Clear()
 EndFunction
 
-; Alias OnLoad calls this so a reloaded dummy stays still and topped up.
+ReferenceAlias Function AliasForBase(ActorBase akBase)
+	If !akBase
+		Return None
+	EndIf
+	If akBase.GetSex() == 1
+		Return FemaleAlias
+	EndIf
+	Return MaleAlias
+EndFunction
+
+; Alias OnLoad: reassert both slots that are filled.
 Function ReassertLiveDummy()
-	Actor dummy = DummyAlias.GetActorReference()
-	If dummy
-		ConfigureDummy(dummy)
+	Actor male = None
+	Actor female = None
+	If MaleAlias
+		male = MaleAlias.GetActorReference()
+	EndIf
+	If FemaleAlias
+		female = FemaleAlias.GetActorReference()
+	EndIf
+	If male
+		ConfigureDummy(male)
+	EndIf
+	If female
+		ConfigureDummy(female)
 	EndIf
 EndFunction
 
@@ -91,7 +129,6 @@ Function ConfigureDummy(Actor dummy)
 	EndIf
 	Int level = Game.GetPlayer().GetLevel()
 	dummy.SetGhost(False)
-	; Keep AI on so RaceMenu/MTF overlays redraw; hold in place instead.
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetLevel(level)
@@ -99,11 +136,10 @@ Function ConfigureDummy(Actor dummy)
 	dummy.RestoreActorValue("Health", 10000.0)
 	Actor player = Game.GetPlayer()
 	If player
-		dummy.SetRelationshipRank(player, 3) ; Friend — pickpocket / reverse-pickpocket without a fight
+		dummy.SetRelationshipRank(player, 3)
 	EndIf
 EndFunction
 
-; Inventory gear (not DefaultOutfit) so pickpocket can strip or dress them.
 Function GiveStartingGear(Actor dummy)
 	If !dummy
 		Return

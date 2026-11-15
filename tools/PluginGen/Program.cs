@@ -1,5 +1,5 @@
 // Generates PTX_TrainingDummy.esp (light plugin):
-// quest+alias, male/female bandit NPCs, self-cast summon/dismiss spells.
+// quest+alias, male/female civilian Nord NPCs, self-cast summon/dismiss spells.
 // FormIDs 0x800 up. Masters: Skyrim.esm only.
 //
 // Usage: PluginGen --out <path/To/PTX_TrainingDummy.esp>
@@ -60,8 +60,10 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
     npc.Factions.Clear();
     npc.Packages.Clear();
-    // Drop bandit keywords so SPID / outfit distributors don't force unpickable gear.
+    // Drop faction keywords so SPID / outfit distributors don't force unpickable gear.
     npc.Keywords?.Clear();
+    // Strip warpaint / makeup layers from the template face record.
+    npc.TintLayers?.Clear();
     // Inventory gear is given at spawn so pickpocket can change it.
     npc.DefaultOutfit.SetToNull();
     npc.Items?.Clear();
@@ -78,18 +80,24 @@ Npc TuneAi(Npc npc)
     return npc;
 }
 
-// --- Quest 0x800 ---
+// --- Quest 0x800 (aliases 0=male, 1=female; both can be live at once) ---
 var quest = new Quest(F(0x800), SkyrimRelease.SkyrimSE)
 {
     EditorID = "PTX_TrainingDummyQuest",
     Name = "Training Dummy",
     Flags = Quest.Flag.StartGameEnabled,
-    NextAliasID = 1,
+    NextAliasID = 2,
 };
 quest.Aliases.Add(new QuestAlias
 {
     ID = 0,
-    Name = "Dummy",
+    Name = "MaleDummy",
+    Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
+});
+quest.Aliases.Add(new QuestAlias
+{
+    ID = 1,
+    Name = "FemaleDummy",
     Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
 });
 
@@ -101,41 +109,54 @@ var questScript = new ScriptEntry
 };
 questScript.Properties.Add(new ScriptObjectProperty
 {
-    Name = "DummyAlias",
+    Name = "MaleAlias",
     Flags = ScriptProperty.Flag.Edited,
     Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
     Alias = 0,
 });
-questAdapter.Scripts.Add(questScript);
-
-var dummyAliasFrag = new QuestFragmentAlias
+questScript.Properties.Add(new ScriptObjectProperty
 {
-    Property = new ScriptObjectProperty
-    {
-        Name = "",
-        Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
-        Alias = 0,
-    },
-};
-var aliasScript = new ScriptEntry
-{
-    Name = "PTX_TrainingDummyAlias",
-    Flags = ScriptEntry.Flag.Local,
-};
-aliasScript.Properties.Add(new ScriptObjectProperty
-{
-    Name = "DummyQuest",
+    Name = "FemaleAlias",
     Flags = ScriptProperty.Flag.Edited,
     Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+    Alias = 1,
 });
-dummyAliasFrag.Scripts.Add(aliasScript);
-questAdapter.Aliases.Add(dummyAliasFrag);
+questAdapter.Scripts.Add(questScript);
+
+QuestFragmentAlias MakeAliasFrag(int aliasId)
+{
+    var frag = new QuestFragmentAlias
+    {
+        Property = new ScriptObjectProperty
+        {
+            Name = "",
+            Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+            Alias = (short)aliasId,
+        },
+    };
+    var script = new ScriptEntry
+    {
+        Name = "PTX_TrainingDummyAlias",
+        Flags = ScriptEntry.Flag.Local,
+    };
+    script.Properties.Add(new ScriptObjectProperty
+    {
+        Name = "DummyQuest",
+        Flags = ScriptProperty.Flag.Edited,
+        Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+    });
+    frag.Scripts.Add(script);
+    return frag;
+}
+questAdapter.Aliases.Add(MakeAliasFrag(0));
+questAdapter.Aliases.Add(MakeAliasFrag(1));
 quest.VirtualMachineAdapter = questAdapter;
 mod.Quests.Add(quest);
 
 // --- NPCs 0x801 / 0x802 ---
-var maleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale"));
-var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
+// Civilian Nords (not EncBandit): cleaner face defaults, no bandit warpaint layers.
+var maleNpc = TuneAi(MakeDummy("Alvor", F(0x801), "PTX_TrainingDummyMale"));
+var femaleNpc = TuneAi(MakeDummy("Ysolda", F(0x802), "PTX_TrainingDummyFemale"));
 mod.Npcs.Add(maleNpc);
 mod.Npcs.Add(femaleNpc);
 
@@ -291,7 +312,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 mod.ModHeader.Author = "proteux";
-mod.ModHeader.Description = "Personal immortal male/female bandit training dummies.";
+mod.ModHeader.Description = "Personal immortal male/female training dummies (civilian Nord bases).";
 mod.ModHeader.MasterReferences.Clear();
 mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
 mod.IsSmallMaster = true;
