@@ -56,8 +56,11 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
 	ConfigureDummy(dummy)
-	GiveStartingGear(dummy)
 	DummyAlias.ForceRefTo(dummy)
+
+	; Equip after a beat so 3D is ready; strip anything SPID/outfit forced on first.
+	Utility.Wait(0.25)
+	GiveStartingGear(dummy)
 
 	Debug.OpenUserLog("TrainingDummy")
 	Debug.TraceUser("TrainingDummy", "--- summon level=" + Game.GetPlayer().GetLevel() + " base=" + akBase.GetName() + " ---")
@@ -105,6 +108,7 @@ Function GiveStartingGear(Actor dummy)
 	If !dummy
 		Return
 	EndIf
+	dummy.UnequipAll()
 	EquipFromFile(dummy, 0x06F393) ; ArmorBanditCuirass
 	EquipFromFile(dummy, 0x06F398) ; ArmorBanditBoots
 	EquipFromFile(dummy, 0x06F39B) ; ArmorBanditGauntlets

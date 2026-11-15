@@ -21,7 +21,7 @@ Enable `PTX_TrainingDummy.esp` in Vortex (F5 if it is not listed). Restart Skyri
 - **Summon Female Training Dummy** — same, female bandit.
 - **Dismiss Training Dummy** — removes the current dummy.
 
-The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit), so you can pickpocket it off or reverse-pickpocket new clothes on. Undress the chest to see body tattoos.
+The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit), so you can pickpocket it off or reverse-pickpocket new clothes on. Undress the chest to see body tattoos. Keywords are cleared so outfit distributors (e.g. SPID) do not force unpickable armor onto them.
 
 Each hit is appended to a user log (also a short on-screen notification):
 

@@ -60,6 +60,8 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
     npc.Factions.Clear();
     npc.Packages.Clear();
+    // Drop bandit keywords so SPID / outfit distributors don't force unpickable gear.
+    npc.Keywords?.Clear();
     // Inventory gear is given at spawn so pickpocket can change it.
     npc.DefaultOutfit.SetToNull();
     npc.Items?.Clear();
