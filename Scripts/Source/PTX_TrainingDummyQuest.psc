@@ -190,6 +190,24 @@ Bool Function PlayerHasSpells()
 	Return player.HasSpell(SummonMaleSpell)
 EndFunction
 
+; Slot 0/1/2 → distinct spellings (shared ActorBase can't hold three FULL names).
+String Function NameForSlot(Bool abFemale, Int aiIndex)
+	If abFemale
+		If aiIndex == 0
+			Return "Megan"
+		ElseIf aiIndex == 1
+			Return "Meghan"
+		EndIf
+		Return "Meagan"
+	EndIf
+	If aiIndex == 0
+		Return "Sean"
+	ElseIf aiIndex == 1
+		Return "Shawn"
+	EndIf
+	Return "Shaun"
+EndFunction
+
 Function SummonMale()
 	ActorBase base = Game.GetFormFromFile(0x801, "PTX_TrainingDummy.esp") as ActorBase
 	Actor player = Game.GetPlayer()
@@ -250,6 +268,7 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	dummy.MoveTo(akCaster, x, y, 0.0, True)
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
+	TrainingDummyUI.SetDisplayName(dummy, NameForSlot(female, slotIndex))
 	ConfigureDummy(dummy)
 	ResetAliasHealthTracking(slot)
 	StartAliasPinWatch(slot, dummy)

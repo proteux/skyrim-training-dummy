@@ -24,18 +24,33 @@ namespace tdui::game {
         return { lines_.begin(), lines_.end() };
     }
 
+    namespace {
+        float SumInWindow(const std::deque<LogEntry>& lines, std::chrono::milliseconds window, bool healing) {
+            const auto cutoff = std::chrono::steady_clock::now() - window;
+            float sum = 0.0f;
+            for (auto it = lines.rbegin(); it != lines.rend(); ++it) {
+                if (it->time < cutoff) {
+                    break;
+                }
+                if (healing) {
+                    if (it->damage < 0.0f) {
+                        sum += -it->damage;
+                    }
+                } else if (it->damage > 0.0f) {
+                    sum += it->damage;
+                }
+            }
+            return sum;
+        }
+    }
+
     float CombatLog::DamageIn(std::chrono::milliseconds window) const {
         std::scoped_lock lock(mutex_);
-        const auto cutoff = std::chrono::steady_clock::now() - window;
-        float sum = 0.0f;
-        for (auto it = lines_.rbegin(); it != lines_.rend(); ++it) {
-            if (it->time < cutoff) {
-                break;
-            }
-            if (it->damage > 0.0f) {
-                sum += it->damage;
-            }
-        }
-        return sum;
+        return SumInWindow(lines_, window, false);
+    }
+
+    float CombatLog::HealingIn(std::chrono::milliseconds window) const {
+        std::scoped_lock lock(mutex_);
+        return SumInWindow(lines_, window, true);
     }
 }

@@ -238,7 +238,10 @@ namespace tdui::ui {
 
         const float d5 = game::CombatLog::Get().DamageIn(5s);
         const float d10 = game::CombatLog::Get().DamageIn(10s);
-        Text("DPS window: 5s %.1f/s (%.0f)   10s %.1f/s (%.0f)", d5 / 5.0f, d5, d10 / 10.0f, d10);
+        const float h5 = game::CombatLog::Get().HealingIn(5s);
+        const float h10 = game::CombatLog::Get().HealingIn(10s);
+        Text("DPS: 5s %.1f/s (%.0f)   10s %.1f/s (%.0f)", d5 / 5.0f, d5, d10 / 10.0f, d10);
+        Text("HPS: 5s %.1f/s (%.0f)   10s %.1f/s (%.0f)", h5 / 5.0f, h5, h10 / 10.0f, h10);
     }
 
     void App::DrawLog() {

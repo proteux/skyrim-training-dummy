@@ -48,6 +48,7 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         ?? throw new InvalidOperationException($"Missing template NPC {templateEditorId} in Skyrim.esm");
     var npc = src.Duplicate(formKey);
     npc.EditorID = editorId;
+    // Fallback only — summon sets a per-slot spelling via TrainingDummyUI.SetDisplayName.
     npc.Name = "Training Dummy";
     npc.Template.Clear();
     npc.Configuration.TemplateFlags = 0;

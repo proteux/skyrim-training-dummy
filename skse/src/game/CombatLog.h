@@ -18,12 +18,14 @@ namespace tdui::game {
     public:
         static CombatLog& Get();
 
+        // damage > 0 = hit, damage < 0 = heal (stored as negative for window sums).
         void Push(float damage, std::string line);
         void Clear();
 
         // Snapshot for the UI thread.
         std::vector<LogEntry> Snapshot() const;
         float DamageIn(std::chrono::milliseconds window) const;
+        float HealingIn(std::chrono::milliseconds window) const;
 
         static constexpr std::size_t kMaxLines = 500;
 

@@ -16,7 +16,11 @@ namespace tdui::game {
         void LogHit(RE::StaticFunctionTag*, float damage, RE::BSFixedString line) {
             std::string text = line.c_str() ? std::string(line.c_str()) : std::string{};
             if (text.empty()) {
-                text = std::format("hit dmg={}", static_cast<int>(damage));
+                if (damage < 0.0f) {
+                    text = std::format("heal amt={}", static_cast<int>(-damage));
+                } else {
+                    text = std::format("hit dmg={}", static_cast<int>(damage));
+                }
             }
             CombatLog::Get().Push(damage, std::move(text));
         }
@@ -39,10 +43,19 @@ namespace tdui::game {
             npc->actorData.calcLevelMax = 0;
         }
 
+        // Per-instance name: shared ActorBases can't hold distinct FULL names.
+        void SetDisplayName(RE::StaticFunctionTag*, RE::Actor* actor, RE::BSFixedString name) {
+            if (!actor || !name.c_str() || name.c_str()[0] == '\0') {
+                return;
+            }
+            actor->SetDisplayName(name, true);
+        }
+
         bool Register(RE::BSScript::IVirtualMachine* vm) {
             vm->RegisterFunction("LogLine", kScript, LogLine);
             vm->RegisterFunction("LogHit", kScript, LogHit);
             vm->RegisterFunction("SetActorLevel", kScript, SetActorLevel);
+            vm->RegisterFunction("SetDisplayName", kScript, SetDisplayName);
             logger::info("Registered Papyrus natives on {}", kScript);
             return true;
         }

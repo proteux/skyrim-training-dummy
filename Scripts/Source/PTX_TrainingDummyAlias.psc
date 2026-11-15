@@ -97,12 +97,9 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 	If !dummy
 		Return
 	EndIf
-	; Health here is already reduced by the hit; report how much was lost this swing.
+	; Health is already updated; delta > 0 = damage, delta < 0 = heal.
 	Float remaining = dummy.GetActorValue("Health")
-	Float damage = LastHealth - remaining
-	If damage < 0.0
-		damage = 0.0
-	EndIf
+	Float delta = LastHealth - remaining
 	LastHealth = remaining
 
 	String sourceName = "?"
@@ -123,23 +120,34 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 		EndIf
 	EndIf
 
-	Int dmgInt = damage as Int
-	String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=" + who
-	If abHitBlocked
-		line += " blocked=1"
-	EndIf
-	Debug.TraceUser("TrainingDummy", line)
-	TrainingDummyUI.LogHit(damage, line)
-	If DummyQuest
-		DummyQuest.Notify("Dummy hit: " + dmgInt + " dmg")
-	Else
-		Debug.Notification("Dummy hit: " + dmgInt + " dmg")
+	If delta > 0.5
+		Int dmgInt = delta as Int
+		String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=" + who
+		If abHitBlocked
+			line += " blocked=1"
+		EndIf
+		Debug.TraceUser("TrainingDummy", line)
+		TrainingDummyUI.LogHit(delta, line)
+		If DummyQuest
+			DummyQuest.Notify("Dummy hit: " + dmgInt + " dmg")
+		Else
+			Debug.Notification("Dummy hit: " + dmgInt + " dmg")
+		EndIf
+		NoteDamage()
+	ElseIf delta < -0.5
+		Float heal = 0.0 - delta
+		Int healInt = heal as Int
+		String line = "heal amt=" + healInt + " source=" + sourceName + " aggressor=" + who
+		Debug.TraceUser("TrainingDummy", line)
+		TrainingDummyUI.LogHit(0.0 - heal, line)
+		If DummyQuest
+			DummyQuest.Notify("Dummy heal: " + healInt)
+		Else
+			Debug.Notification("Dummy heal: " + healInt)
+		EndIf
 	EndIf
 
 	PinInPlace(dummy)
-	If damage > 0.0
-		NoteDamage()
-	EndIf
 EndEvent
 
 ; Essential NPC — collapse, then stand back up at full health without chasing.
@@ -206,31 +214,40 @@ Event OnUpdate()
 	EndIf
 EndEvent
 
-; Logs damage when health falls without an OnHit (Spell aura CastAs path).
+; Logs damage or healing when HP changes without an OnHit (Spell aura CastAs path).
 Function ReportHealthDrop(Actor dummy, String sourceName)
 	If !dummy
 		Return
 	EndIf
 	Float remaining = dummy.GetActorValue("Health")
-	Float damage = LastHealth - remaining
-	If damage < 0.5
-		; Heal / restore — keep the tracker current without a "hit".
-		If remaining > LastHealth
-			LastHealth = remaining
-		EndIf
+	Float delta = LastHealth - remaining
+	If delta < 0.5 && delta > -0.5
 		Return
 	EndIf
 	LastHealth = remaining
-	Int dmgInt = damage as Int
-	String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=?"
-	Debug.TraceUser("TrainingDummy", line)
-	TrainingDummyUI.LogHit(damage, line)
-	If DummyQuest
-		DummyQuest.Notify("Dummy hit: " + dmgInt + " dmg")
-	Else
-		Debug.Notification("Dummy hit: " + dmgInt + " dmg")
+	If delta > 0.0
+		Int dmgInt = delta as Int
+		String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=?"
+		Debug.TraceUser("TrainingDummy", line)
+		TrainingDummyUI.LogHit(delta, line)
+		If DummyQuest
+			DummyQuest.Notify("Dummy hit: " + dmgInt + " dmg")
+		Else
+			Debug.Notification("Dummy hit: " + dmgInt + " dmg")
+		EndIf
+		NoteDamage()
+		Return
 	EndIf
-	NoteDamage()
+	Float heal = 0.0 - delta
+	Int healInt = heal as Int
+	String line = "heal amt=" + healInt + " source=" + sourceName + " aggressor=?"
+	Debug.TraceUser("TrainingDummy", line)
+	TrainingDummyUI.LogHit(0.0 - heal, line)
+	If DummyQuest
+		DummyQuest.Notify("Dummy heal: " + healInt)
+	Else
+		Debug.Notification("Dummy heal: " + healInt)
+	EndIf
 EndFunction
 
 ; Pin without breaking combat — restrained stops the run-in-place.
