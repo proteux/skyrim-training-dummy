@@ -31,6 +31,15 @@ Lines look like `hit dmg=47 source=Firebolt aggressor=...`, with `--- summon lev
 
 Harmful MTF spell auras that require hostility will not hit this dummy; use a real enemy bandit for those.
 
+## Face (female)
+
+RaceMenu CharGen export lives in the repo as FaceGen for `PTX_TrainingDummyFemale` (`0x802`):
+
+- `Data/meshes/actors/character/FaceGenData/FaceGeom/PTX_TrainingDummy.esp/00000802.nif`
+- `Data/textures/actors/character/FaceGenData/FaceTint/PTX_TrainingDummy.esp/00000802.dds`
+
+`make live` copies those into the game Data folder. Source export was `Data/SKSE/Plugins/CharGen/Female_Dummy.*`. If the face is dark or wrong in game, a CK Ctrl+F4 + NPC Nif Merge pass is the usual fix; without CK this is a direct CharGen install.
+
 ## Build notes
 
 Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen reads `Skyrim.esm` to clone the bandit templates.

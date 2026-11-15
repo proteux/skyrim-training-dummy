@@ -26,12 +26,34 @@ if [[ -z "${NUGET_PACKAGES:-}" || "$NUGET_PACKAGES" == *cursor-sandbox-cache* ]]
   export NUGET_PACKAGES="/c/Users/white/.nuget/packages"
 fi
 
+FACEGEOM_REL="meshes/actors/character/FaceGenData/FaceGeom/$ESP_BASE.esp"
+FACETINT_REL="textures/actors/character/FaceGenData/FaceTint/$ESP_BASE.esp"
+
 remove_from() {
   local root="$1" script
   rm -f "$root/$ESP_BASE.esp" "$root/Seq/$ESP_BASE.seq"
   for script in "${SHIPPED[@]}" "${RETIRED[@]}"; do
     rm -f "$root/Scripts/$script.pex" "$root/Scripts/Source/$script.psc"
   done
+  rm -rf "$root/$FACEGEOM_REL" "$root/$FACETINT_REL"
+}
+
+install_facegen() {
+  local dest_root="$1"
+  local src_geom="$HERE/Data/$FACEGEOM_REL"
+  local src_tint="$HERE/Data/$FACETINT_REL"
+  if [[ ! -d "$src_geom" && ! -d "$src_tint" ]]; then
+    return
+  fi
+  if [[ -d "$src_geom" ]]; then
+    mkdir -p "$dest_root/$FACEGEOM_REL"
+    cp -f "$src_geom/"*.nif "$dest_root/$FACEGEOM_REL/" 2>/dev/null || true
+  fi
+  if [[ -d "$src_tint" ]]; then
+    mkdir -p "$dest_root/$FACETINT_REL"
+    cp -f "$src_tint/"*.dds "$dest_root/$FACETINT_REL/" 2>/dev/null || true
+  fi
+  echo "Installed FaceGen under $FACEGEOM_REL / $FACETINT_REL"
 }
 
 warn_if_not_enabled() {
@@ -115,11 +137,17 @@ echo "=== generating $ESP_BASE.esp ==="
     --out "$(cygpath -w "$DIST/$ESP_BASE.esp")"
 )
 
+# Stage FaceGen next to the esp in dist/ for packaging later.
+install_facegen "$DIST"
+
 [[ "$TARGET" == build ]] && { echo "Built $DIST"; exit 0; }
 
 mkdir -p "$DATA/Scripts/Source" "$DATA/Seq"
+# FaceGen first — not locked by Skyrim the way the esp is.
+install_facegen "$DATA"
 if ! cp -f "$DIST/$ESP_BASE.esp" "$DATA/"; then
   echo "Couldn't copy $ESP_BASE.esp into $DATA. Quit Skyrim and run this again." >&2
+  echo "FaceGen (if any) was still installed; only the esp/scripts need a rerun." >&2
   exit 1
 fi
 cp -f "$DIST/Seq/$ESP_BASE.seq" "$DATA/Seq/"
