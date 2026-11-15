@@ -25,6 +25,8 @@ namespace tdui::ui {
         void DrawControls(bool windowMode);
         void DrawSummonSettings();
         void DrawStatus();
+        void DrawCombatTabs();
+        void DrawMeters();
         void DrawLog();
 
         io::UiSettings settings_;

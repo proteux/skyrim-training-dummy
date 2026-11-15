@@ -9,6 +9,10 @@ namespace tdui::ui {
 
     namespace {
         constexpr ImVec4 kWarn{ 0.95f, 0.75f, 0.30f, 1.0f };
+        constexpr ImVec4 kDamage{ 0.95f, 0.45f, 0.30f, 1.0f };
+        constexpr ImVec4 kHeal{ 0.40f, 0.85f, 0.50f, 1.0f };
+        constexpr int kMeterBuckets = 40;
+        constexpr float kMeterWindowSec = 10.0f;
 
         void SlotCell(const game::DummySlotStatus& s) {
             if (s.present) {
@@ -26,6 +30,54 @@ namespace tdui::ui {
                 TableNextColumn();
                 SlotCell(s);
             }
+        }
+
+        // Wall-clock buckets so the plot scrolls with time; values are per-second rates.
+        void FillRateBuckets(const std::vector<game::LogEntry>& lines, float* damageOut, float* healOut) {
+            std::fill(damageOut, damageOut + kMeterBuckets, 0.0f);
+            std::fill(healOut, healOut + kMeterBuckets, 0.0f);
+            const auto now = std::chrono::steady_clock::now();
+            const float bucketSec = kMeterWindowSec / static_cast<float>(kMeterBuckets);
+            for (const auto& e : lines) {
+                const float age = std::chrono::duration<float>(now - e.time).count();
+                if (age < 0.0f || age >= kMeterWindowSec) {
+                    continue;
+                }
+                const int idx = std::clamp(
+                    static_cast<int>((kMeterWindowSec - age) / bucketSec), 0, kMeterBuckets - 1);
+                if (e.damage > 0.0f) {
+                    damageOut[idx] += e.damage;
+                } else if (e.damage < 0.0f) {
+                    healOut[idx] += -e.damage;
+                }
+            }
+            const float invBucket = 1.0f / bucketSec;
+            for (int i = 0; i < kMeterBuckets; ++i) {
+                damageOut[i] *= invBucket;
+                healOut[i] *= invBucket;
+            }
+        }
+
+        float SeriesPeak(const float* values, int count) {
+            float peak = 0.0f;
+            for (int i = 0; i < count; ++i) {
+                peak = std::max(peak, values[i]);
+            }
+            return peak;
+        }
+
+        void DrawRateMeter(const char* label, const char* plotId, float rate5, float total5, float rate10,
+            float total10, const float* buckets, float scaleMax, const ImVec4& color) {
+            TextColored(color, "%s", label);
+            SameLine();
+            Text("%.1f/s", rate10);
+            TextDisabled("5s %.1f/s (%.0f)   ·   10s %.1f/s (%.0f)", rate5, total5, rate10, total10);
+
+            const std::string overlay = std::format("{:.1f}/s", rate10);
+            PushStyleColor(ImGuiCol_PlotHistogram, color);
+            PlotHistogram(plotId, buckets, kMeterBuckets, 0, overlay.c_str(), 0.0f, scaleMax,
+                ImVec2{ -1.0f, 96.0f });
+            PopStyleColor();
         }
     }
 
@@ -87,7 +139,7 @@ namespace tdui::ui {
         Separator();
         DrawStatus();
         Separator();
-        DrawLog();
+        DrawCombatTabs();
     }
 
     void App::DrawWindow() {
@@ -102,7 +154,7 @@ namespace tdui::ui {
             Separator();
             DrawStatus();
             Separator();
-            DrawLog();
+            DrawCombatTabs();
         }
         End();
         if (!open) {
@@ -235,13 +287,45 @@ namespace tdui::ui {
             GenderRow("F", st.female);
             EndTable();
         }
+    }
 
+    void App::DrawCombatTabs() {
+        // Rates first so ImGui opens it by default.
+        if (!BeginTabBar("##combat")) {
+            return;
+        }
+        if (BeginTabItem("Rates")) {
+            DrawMeters();
+            EndTabItem();
+        }
+        if (BeginTabItem("Log")) {
+            DrawLog();
+            EndTabItem();
+        }
+        EndTabBar();
+    }
+
+    void App::DrawMeters() {
         const float d5 = game::CombatLog::Get().DamageIn(5s);
         const float d10 = game::CombatLog::Get().DamageIn(10s);
         const float h5 = game::CombatLog::Get().HealingIn(5s);
         const float h10 = game::CombatLog::Get().HealingIn(10s);
-        Text("DPS: 5s %.1f/s (%.0f)   10s %.1f/s (%.0f)", d5 / 5.0f, d5, d10 / 10.0f, d10);
-        Text("HPS: 5s %.1f/s (%.0f)   10s %.1f/s (%.0f)", h5 / 5.0f, h5, h10 / 10.0f, h10);
+
+        float damageBuckets[kMeterBuckets];
+        float healBuckets[kMeterBuckets];
+        FillRateBuckets(game::CombatLog::Get().Snapshot(), damageBuckets, healBuckets);
+        const float scaleMax = std::max(1.0f, std::max(SeriesPeak(damageBuckets, kMeterBuckets),
+                                                 SeriesPeak(healBuckets, kMeterBuckets)) *
+                                                 1.15f);
+
+        if (BeginTable("##meters", 2, ImGuiTableFlags_SizingStretchSame)) {
+            TableNextColumn();
+            DrawRateMeter("DPS", "##dpsplot", d5 / 5.0f, d5, d10 / 10.0f, d10, damageBuckets, scaleMax, kDamage);
+            TableNextColumn();
+            DrawRateMeter("HPS", "##hpsplot", h5 / 5.0f, h5, h10 / 10.0f, h10, healBuckets, scaleMax, kHeal);
+            EndTable();
+        }
+        TextDisabled("Last %.0fs  (bars share scale)", kMeterWindowSec);
     }
 
     void App::DrawLog() {
@@ -265,7 +349,13 @@ namespace tdui::ui {
         const auto lines = game::CombatLog::Get().Snapshot();
         BeginChild("##combatlog", ImVec2{ 0, 0 }, ImGuiChildFlags_Border);
         for (const auto& e : lines) {
-            TextUnformatted(e.line.c_str());
+            if (e.damage > 0.0f) {
+                TextColored(kDamage, "%s", e.line.c_str());
+            } else if (e.damage < 0.0f) {
+                TextColored(kHeal, "%s", e.line.c_str());
+            } else {
+                TextUnformatted(e.line.c_str());
+            }
         }
         // SetScrollHereY is deferred until EndChild, so never infer "scrolled up"
         // from GetScrollY on the same frame — that was clearing the checkbox.
