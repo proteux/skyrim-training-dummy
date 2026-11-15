@@ -64,6 +64,8 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
     npc.Keywords?.Clear();
     // Strip warpaint / makeup layers from the template face record.
     npc.TintLayers?.Clear();
+    // Match typical RaceMenu export weight so FaceGen necks line up better.
+    npc.Weight = 100f;
     // Inventory gear is given at spawn so pickpocket can change it.
     npc.DefaultOutfit.SetToNull();
     npc.Items?.Clear();
@@ -154,9 +156,11 @@ quest.VirtualMachineAdapter = questAdapter;
 mod.Quests.Add(quest);
 
 // --- NPCs 0x801 / 0x802 ---
-// Civilian Nords (not EncBandit): cleaner face defaults, no bandit warpaint layers.
+// Male: civilian Nord (Alvor). Female: EncBandit Nord — CBBE/naked body path
+// works; Ysolda-unique clones went solid black when undressed. FaceGen heads
+// still come from CharGen Male_Dummy / Female_Dummy.
 var maleNpc = TuneAi(MakeDummy("Alvor", F(0x801), "PTX_TrainingDummyMale"));
-var femaleNpc = TuneAi(MakeDummy("Ysolda", F(0x802), "PTX_TrainingDummyFemale"));
+var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
 mod.Npcs.Add(maleNpc);
 mod.Npcs.Add(femaleNpc);
 
@@ -312,7 +316,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 mod.ModHeader.Author = "proteux";
-mod.ModHeader.Description = "Personal immortal male/female training dummies (civilian Nord bases).";
+mod.ModHeader.Description = "Personal immortal training dummies (Alvor male / bandit-Nord female + RaceMenu FaceGen).";
 mod.ModHeader.MasterReferences.Clear();
 mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
 mod.IsSmallMaster = true;

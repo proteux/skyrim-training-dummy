@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal, non-hostile, matches the player level. Male/female bases are civilian Nords (Alvor / Ysolda clones); they still spawn in bandit gear for a combat dummy look. One of each can be out at the same time; summoning again replaces only that gender.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal, non-hostile, matches the player level. Male base is Alvor; female is EncBandit Nord (Ysolda clones blacked out the undressed CBBE body). Both use RaceMenu FaceGen heads and spawn in bandit gear. One of each can be out at the same time; summoning again replaces only that gender.
 
 ## Requirements
 
@@ -31,15 +31,17 @@ Lines look like `hit dmg=47 source=Firebolt aggressor=...`, with `--- summon lev
 
 Harmful MTF spell auras that require hostility will not hit this dummy; use a real enemy bandit for those.
 
-## Face (female)
+## Faces
 
-RaceMenu CharGen export lives in the repo as FaceGen for `PTX_TrainingDummyFemale` (`0x802`):
+RaceMenu Sculpt → Export Head as `Male_Dummy` / `Female_Dummy` into `Data/SKSE/Plugins/CharGen/`.
 
-- `Data/meshes/actors/character/FaceGenData/FaceGeom/PTX_TrainingDummy.esp/00000802.nif`
-- `Data/textures/actors/character/FaceGenData/FaceTint/PTX_TrainingDummy.esp/00000802.dds`
+`make live` runs `tools/sync_facegen.py`, which:
 
-`make live` copies those into the game Data folder. Source export was `Data/SKSE/Plugins/CharGen/Female_Dummy.*`. If the face is dark or wrong in game, a CK Ctrl+F4 + NPC Nif Merge pass is the usual fix; without CK this is a direct CharGen install.
+- copies the `.nif`/`.dds` into FaceGen FormIDs `00000801` (male) and `00000802` (female)
+- also writes `CharGen/<name>.nif.dds` (the tint path embedded in RaceMenu nifs)
+
+Starting gear omits the bandit helmet so KS hair from the export stays visible.
 
 ## Build notes
 
-Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen clones Alvor / Ysolda from `Skyrim.esm`, then clears factions, tint layers, and outfits.
+Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, `make live` installs into `SKYRIM_DIR` (default Steam SSE path). Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, or `PLUGINS_TXT`. PluginGen clones Alvor / EncBandit01Melee1HNordF from `Skyrim.esm`, then clears factions, tint layers, and outfits.

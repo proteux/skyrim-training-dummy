@@ -130,6 +130,9 @@ for pex in "$DIST/Scripts/"*.pex; do
   fi
 done
 
+echo "=== syncing FaceGen from CharGen ==="
+python "$HERE/tools/sync_facegen.py" --skyrim-data "$DATA" --repo-data "$HERE/Data"
+
 echo "=== generating $ESP_BASE.esp ==="
 (
   export MSYS_NO_PATHCONV=1

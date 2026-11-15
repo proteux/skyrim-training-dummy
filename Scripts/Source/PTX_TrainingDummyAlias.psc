@@ -1,7 +1,15 @@
 ScriptName PTX_TrainingDummyAlias extends ReferenceAlias
-{Keeps the dummy still, at player level, and immortal via OnHit heal.}
+{Keeps the dummy still, at player level, and immortal via Essential + bleedout heal.}
 
 PTX_TrainingDummyQuest Property DummyQuest Auto
+
+; Max health; also tracks HP before the latest OnHit for per-hit damage logging.
+Float Property MaxHealth = 1000.0 Auto
+Float LastHealth = 1000.0
+
+Function ResetHealthTracking()
+	LastHealth = MaxHealth
+EndFunction
 
 Event OnLoad()
 	If DummyQuest
@@ -16,13 +24,13 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 	If !dummy
 		Return
 	EndIf
-	; Health here is already reduced by the hit; restore and report how much was lost.
+	; Health here is already reduced by the hit; report how much was lost this swing.
 	Float remaining = dummy.GetActorValue("Health")
-	Float damage = 10000.0 - remaining
+	Float damage = LastHealth - remaining
 	If damage < 0.0
 		damage = 0.0
 	EndIf
-	dummy.RestoreActorValue("Health", 10000.0)
+	LastHealth = remaining
 
 	String sourceName = "?"
 	If akSource
@@ -51,6 +59,18 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 	Debug.Notification("Dummy hit: " + dmgInt + " dmg")
 EndEvent
 
+; Essential NPC — collapse, then stand back up at full health.
+Event OnEnterBleedout()
+	Actor dummy = GetActorReference()
+	If !dummy
+		Return
+	EndIf
+	dummy.RestoreActorValue("Health", MaxHealth)
+	LastHealth = MaxHealth
+	Debug.TraceUser("TrainingDummy", "--- bleedout heal ---")
+	Debug.Notification("Dummy stood back up.")
+EndEvent
+
 Function Configure()
 	Actor dummy = GetActorReference()
 	If !dummy
@@ -60,6 +80,7 @@ Function Configure()
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetLevel(Game.GetPlayer().GetLevel())
-	dummy.SetActorValue("Health", 10000.0)
-	dummy.RestoreActorValue("Health", 10000.0)
+	dummy.SetActorValue("Health", MaxHealth)
+	dummy.RestoreActorValue("Health", MaxHealth)
+	LastHealth = MaxHealth
 EndFunction

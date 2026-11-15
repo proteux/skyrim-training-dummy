@@ -68,6 +68,7 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 
 	ConfigureDummy(dummy)
 	slot.ForceRefTo(dummy)
+	ResetAliasHealthTracking(slot)
 
 	Utility.Wait(0.25)
 	GiveStartingGear(dummy)
@@ -117,9 +118,18 @@ Function ReassertLiveDummy()
 	EndIf
 	If male
 		ConfigureDummy(male)
+		ResetAliasHealthTracking(MaleAlias)
 	EndIf
 	If female
 		ConfigureDummy(female)
+		ResetAliasHealthTracking(FemaleAlias)
+	EndIf
+EndFunction
+
+Function ResetAliasHealthTracking(ReferenceAlias slot)
+	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
+	If typed
+		typed.ResetHealthTracking()
 	EndIf
 EndFunction
 
@@ -132,8 +142,8 @@ Function ConfigureDummy(Actor dummy)
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetLevel(level)
-	dummy.SetActorValue("Health", 10000.0)
-	dummy.RestoreActorValue("Health", 10000.0)
+	dummy.SetActorValue("Health", 1000.0)
+	dummy.RestoreActorValue("Health", 1000.0)
 	Actor player = Game.GetPlayer()
 	If player
 		dummy.SetRelationshipRank(player, 3)
@@ -148,7 +158,7 @@ Function GiveStartingGear(Actor dummy)
 	EquipFromFile(dummy, 0x06F393) ; ArmorBanditCuirass
 	EquipFromFile(dummy, 0x06F398) ; ArmorBanditBoots
 	EquipFromFile(dummy, 0x06F39B) ; ArmorBanditGauntlets
-	EquipFromFile(dummy, 0x06F39E) ; ArmorBanditHelmet
+	; No helmet — RaceMenu/KS hair from FaceGen stays visible.
 EndFunction
 
 Function EquipFromFile(Actor dummy, Int formId)
