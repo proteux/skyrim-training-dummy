@@ -1,0 +1,4 @@
+dist/
+tools/*/bin/
+tools/*/obj/
+*.pex

@@ -1,0 +1,321 @@
+// Generates PTX_TrainingDummy.esp (light plugin):
+// quest+alias, male/female bandit NPCs, self-cast summon/dismiss spells.
+// FormIDs 0x800 up. Masters: Skyrim.esm only.
+//
+// Usage: PluginGen --out <path/To/PTX_TrainingDummy.esp>
+// Optional: --skyrim-data <Skyrim Data folder> (default Steam SSE path / SKYRIM_DIR/Data)
+using Mutagen.Bethesda;
+using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Binary.Parameters;
+using Mutagen.Bethesda.Plugins.Records;
+using Mutagen.Bethesda.Skyrim;
+
+var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+for (var i = 0; i + 1 < args.Length; i += 2)
+{
+    if (!args[i].StartsWith("--"))
+        throw new ArgumentException($"Unexpected argument '{args[i]}'.");
+    options[args[i][2..]] = args[i + 1];
+}
+if (!options.TryGetValue("out", out var outputPath) || string.IsNullOrWhiteSpace(outputPath))
+    throw new ArgumentException("Missing --out <path>.");
+outputPath = Path.GetFullPath(outputPath);
+
+var skyrimData = options.GetValueOrDefault("skyrim-data");
+if (string.IsNullOrWhiteSpace(skyrimData))
+{
+    var skyrimDir = Environment.GetEnvironmentVariable("SKYRIM_DIR");
+    skyrimData = string.IsNullOrWhiteSpace(skyrimDir)
+        ? @"C:\Program Files (x86)\Steam\steamapps\common\Skyrim Special Edition\Data"
+        : Path.Combine(skyrimDir, "Data");
+}
+var skyrimEsmPath = Path.Combine(skyrimData, "Skyrim.esm");
+if (!File.Exists(skyrimEsmPath))
+    throw new FileNotFoundException($"Skyrim.esm not found at {skyrimEsmPath}. Pass --skyrim-data.");
+
+var modKey = ModKey.FromFileName(Path.GetFileName(outputPath));
+var mod = new SkyrimMod(modKey, SkyrimRelease.SkyrimSE);
+var skyrim = ModKey.FromFileName("Skyrim.esm");
+var eitherHand = new FormKey(skyrim, 0x13F44);
+
+FormKey F(uint id) => new(modKey, id);
+
+using var skyrimMod = SkyrimMod.CreateFromBinaryOverlay(skyrimEsmPath, SkyrimRelease.SkyrimSE);
+
+Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
+{
+    var src = skyrimMod.Npcs.FirstOrDefault(n => n.EditorID == templateEditorId)
+        ?? throw new InvalidOperationException($"Missing template NPC {templateEditorId} in Skyrim.esm");
+    var npc = src.Duplicate(formKey);
+    npc.EditorID = editorId;
+    npc.Name = "Training Dummy";
+    npc.Template.Clear();
+    npc.Configuration.TemplateFlags = 0;
+    npc.Configuration.Flags &= ~(NpcConfiguration.Flag.Respawn
+        | NpcConfiguration.Flag.Invulnerable
+        | NpcConfiguration.Flag.IsGhost
+        | NpcConfiguration.Flag.Summonable);
+    npc.Configuration.Flags |= NpcConfiguration.Flag.Essential
+        | NpcConfiguration.Flag.Unique
+        | NpcConfiguration.Flag.DoesntAffectStealthMeter;
+    npc.Factions.Clear();
+    npc.Packages.Clear();
+    return npc;
+}
+
+Npc TuneAi(Npc npc)
+{
+    npc.AIData ??= new AIData();
+    npc.AIData.Aggression = Aggression.Unaggressive;
+    npc.AIData.Confidence = Confidence.Average;
+    npc.AIData.Assistance = Assistance.HelpsNobody;
+    npc.AIData.Mood = Mood.Neutral;
+    return npc;
+}
+
+// --- Quest 0x800 ---
+var quest = new Quest(F(0x800), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyQuest",
+    Name = "Training Dummy",
+    Flags = Quest.Flag.StartGameEnabled,
+    NextAliasID = 1,
+};
+quest.Aliases.Add(new QuestAlias
+{
+    ID = 0,
+    Name = "Dummy",
+    Flags = QuestAlias.Flag.Optional | QuestAlias.Flag.AllowReuseInQuest,
+});
+
+var questAdapter = new QuestAdapter { Version = 5, ObjectFormat = 2 };
+var questScript = new ScriptEntry
+{
+    Name = "PTX_TrainingDummyQuest",
+    Flags = ScriptEntry.Flag.Local,
+};
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "DummyAlias",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+    Alias = 0,
+});
+questAdapter.Scripts.Add(questScript);
+
+var dummyAliasFrag = new QuestFragmentAlias
+{
+    Property = new ScriptObjectProperty
+    {
+        Name = "",
+        Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+        Alias = 0,
+    },
+};
+var aliasScript = new ScriptEntry
+{
+    Name = "PTX_TrainingDummyAlias",
+    Flags = ScriptEntry.Flag.Local,
+};
+aliasScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "DummyQuest",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+});
+dummyAliasFrag.Scripts.Add(aliasScript);
+questAdapter.Aliases.Add(dummyAliasFrag);
+quest.VirtualMachineAdapter = questAdapter;
+mod.Quests.Add(quest);
+
+// --- NPCs 0x801 / 0x802 ---
+var maleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale"));
+var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
+mod.Npcs.Add(maleNpc);
+mod.Npcs.Add(femaleNpc);
+
+// Self-cast Script effects (Transmute pattern). TargetLocation+explosion never
+// fired Papyrus for us; cast-on-self is reliable for a personal tool.
+(MagicEffect mgef, Spell spell) MakeSummon(
+    FormKey mgefKey, FormKey spellKey, string genderLabel, Npc dummyBase)
+{
+    var mgef = new MagicEffect(mgefKey, SkyrimRelease.SkyrimSE)
+    {
+        EditorID = $"PTX_TrainingDummySummon{genderLabel}MGEF",
+        Name = $"Summon {genderLabel} Training Dummy",
+        Flags = MagicEffect.Flag.NoMagnitude
+            | MagicEffect.Flag.NoArea
+            | MagicEffect.Flag.HideInUI
+            | MagicEffect.Flag.NoHitEffect,
+        MenuDisplayObject = new FormLinkNullable<IStaticGetter>(new FormKey(skyrim, 0x43DF4)),
+        MagicSkill = ActorValue.Conjuration,
+        CastType = CastType.FireAndForget,
+        TargetType = TargetType.Self,
+        CastingSoundLevel = SoundLevel.Normal,
+        DualCastScale = 1f,
+        Archetype = new MagicEffectArchetype
+        {
+            Type = MagicEffectArchetype.TypeEnum.Script,
+            ActorValue = ActorValue.None,
+        },
+    };
+    var adapter = new VirtualMachineAdapter { Version = 5, ObjectFormat = 2 };
+    var script = new ScriptEntry
+    {
+        Name = "PTX_TrainingDummySummon",
+        Flags = ScriptEntry.Flag.Local,
+    };
+    script.Properties.Add(new ScriptObjectProperty
+    {
+        Name = "DummyQuest",
+        Flags = ScriptProperty.Flag.Edited,
+        Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+    });
+    script.Properties.Add(new ScriptObjectProperty
+    {
+        Name = "DummyBase",
+        Flags = ScriptProperty.Flag.Edited,
+        Object = new FormLink<ISkyrimMajorRecordGetter>(dummyBase.FormKey),
+    });
+    adapter.Scripts.Add(script);
+    mgef.VirtualMachineAdapter = adapter;
+
+    var spell = new Spell(spellKey, SkyrimRelease.SkyrimSE)
+    {
+        EditorID = $"PTX_TrainingDummySummon{genderLabel}",
+        Name = $"Summon {genderLabel} Training Dummy",
+        Description = $"Places an immortal {genderLabel.ToLowerInvariant()} training dummy in front of you. Replaces any existing dummy.",
+        Type = SpellType.Spell,
+        CastType = CastType.FireAndForget,
+        TargetType = TargetType.Self,
+        BaseCost = 0,
+        ChargeTime = 0.5f,
+        Flags = SpellDataFlag.ManualCostCalc | SpellDataFlag.NoAbsorbOrReflect,
+    };
+    spell.EquipmentType.SetTo(eitherHand);
+    var effect = new Effect
+    {
+        Data = new EffectData { Magnitude = 0, Area = 0, Duration = 1 },
+    };
+    effect.BaseEffect.SetTo(mgef.FormKey);
+    spell.Effects.Add(effect);
+    return (mgef, spell);
+}
+
+// Keep spell FormIDs stable from 0.2.x (0x808 / 0x80A / 0x80C).
+var (summonMaleMgef, summonMaleSpell) = MakeSummon(F(0x807), F(0x808), "Male", maleNpc);
+var (summonFemaleMgef, summonFemaleSpell) = MakeSummon(F(0x809), F(0x80A), "Female", femaleNpc);
+mod.MagicEffects.Add(summonMaleMgef);
+mod.MagicEffects.Add(summonFemaleMgef);
+mod.Spells.Add(summonMaleSpell);
+mod.Spells.Add(summonFemaleSpell);
+
+var dismissMgef = new MagicEffect(F(0x80B), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyDismissMGEF",
+    Name = "Dismiss Training Dummy",
+    Flags = MagicEffect.Flag.NoMagnitude
+        | MagicEffect.Flag.NoArea
+        | MagicEffect.Flag.HideInUI
+        | MagicEffect.Flag.NoHitEffect,
+    MagicSkill = ActorValue.Alteration,
+    CastType = CastType.FireAndForget,
+    TargetType = TargetType.Self,
+    CastingSoundLevel = SoundLevel.Silent,
+    DualCastScale = 1f,
+    Archetype = new MagicEffectArchetype
+    {
+        Type = MagicEffectArchetype.TypeEnum.Script,
+        ActorValue = ActorValue.None,
+    },
+};
+var dismissAdapter = new VirtualMachineAdapter { Version = 5, ObjectFormat = 2 };
+var dismissScript = new ScriptEntry
+{
+    Name = "PTX_TrainingDummyDismiss",
+    Flags = ScriptEntry.Flag.Local,
+};
+dismissScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "DummyQuest",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
+});
+dismissAdapter.Scripts.Add(dismissScript);
+dismissMgef.VirtualMachineAdapter = dismissAdapter;
+mod.MagicEffects.Add(dismissMgef);
+
+var dismissSpell = new Spell(F(0x80C), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyDismiss",
+    Name = "Dismiss Training Dummy",
+    Description = "Removes the current training dummy.",
+    Type = SpellType.Spell,
+    CastType = CastType.FireAndForget,
+    TargetType = TargetType.Self,
+    BaseCost = 0,
+    ChargeTime = 0.5f,
+    Flags = SpellDataFlag.ManualCostCalc | SpellDataFlag.NoAbsorbOrReflect,
+};
+dismissSpell.EquipmentType.SetTo(eitherHand);
+var dismissEffect = new Effect
+{
+    Data = new EffectData { Magnitude = 0, Area = 0, Duration = 1 },
+};
+dismissEffect.BaseEffect.SetTo(dismissMgef.FormKey);
+dismissSpell.Effects.Add(dismissEffect);
+mod.Spells.Add(dismissSpell);
+
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "SummonMaleSpell",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(summonMaleSpell.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "SummonFemaleSpell",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(summonFemaleSpell.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "DismissSpell",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(dismissSpell.FormKey),
+});
+
+mod.ModHeader.Author = "proteux";
+mod.ModHeader.Description = "Personal immortal male/female bandit training dummies.";
+mod.ModHeader.MasterReferences.Clear();
+mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
+mod.IsSmallMaster = true;
+
+var outputDir = Path.GetDirectoryName(outputPath)!;
+Directory.CreateDirectory(outputDir);
+mod.WriteToBinary(outputPath, new BinaryWriteParameters
+{
+    MastersListContent = MastersListContentOption.NoCheck,
+});
+Console.WriteLine($"Wrote {outputPath}");
+
+var seqDir = Path.Combine(outputDir, "Seq");
+Directory.CreateDirectory(seqDir);
+var seqPath = Path.Combine(seqDir, Path.GetFileNameWithoutExtension(outputPath) + ".seq");
+var seqFormId = ((uint)mod.ModHeader.MasterReferences.Count << 24) | quest.FormKey.ID;
+using (var seq = File.Create(seqPath))
+using (var writer = new BinaryWriter(seq))
+{
+    writer.Write(seqFormId);
+}
+Console.WriteLine($"Wrote {seqPath} ({seqFormId:X8})");
+
+using var check = SkyrimMod.CreateFromBinaryOverlay(outputPath, SkyrimRelease.SkyrimSE);
+Console.WriteLine($"Light {check.IsSmallMaster}, masters: " + string.Join(", ", check.ModHeader.MasterReferences.Select(m => m.Master.ToString())));
+Console.WriteLine($"Quests {check.Quests.Count}, Npcs {check.Npcs.Count}, Spells {check.Spells.Count}, MGEFs {check.MagicEffects.Count}, Activators {check.Activators.Count}, Explosions {check.Explosions.Count}");
+foreach (var n in check.Npcs)
+    Console.WriteLine($"  NPC {n.EditorID} female={n.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female)} essential={n.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Essential)} factions={n.Factions.Count} aggression={n.AIData?.Aggression}");
+foreach (var s in check.Spells)
+    Console.WriteLine($"  SPEL {s.EditorID} target={s.TargetType} cast={s.CastType}");
+foreach (var m in check.MagicEffects)
+    Console.WriteLine($"  MGEF {m.EditorID} arch={m.Archetype?.Type} target={m.TargetType} scripts={m.VirtualMachineAdapter?.Scripts.Count ?? 0}");
