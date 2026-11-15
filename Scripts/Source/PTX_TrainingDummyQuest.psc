@@ -15,8 +15,13 @@ Bool Property MatchPlayerLevel = True Auto
 Int Property DummyLevel = 1 Auto
 Float Property HealthPerLevel = 50.0 Auto
 Bool Property MuteNotifications = True Auto
-; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) for harmful Spell aura tests.
+; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) / Archnemesis also join
+; HostileFaction (enemy only to PlayerFaction) so IsHostileToActor(player) is true
+; for harmful Spell auras without making town guards attack them. SafeFaction is
+; always applied so hitting / hexing a dummy does not report as town assault.
 Int Property RelationshipRank = 3 Auto
+Faction Property HostileFaction Auto
+Faction Property SafeFaction Auto
 
 Event OnInit()
 	RegisterForSingleUpdate(2.0)
@@ -287,6 +292,36 @@ Int Function GetFemaleFormID()
 	Return 0
 EndFunction
 
+Faction Function ResolveHostileFaction()
+	If HostileFaction
+		Return HostileFaction
+	EndIf
+	; PTX_TrainingDummyHostileFaction (0x803) — enemy only to PlayerFaction.
+	HostileFaction = Game.GetFormFromFile(0x803, "PTX_TrainingDummy.esp") as Faction
+	Return HostileFaction
+EndFunction
+
+Faction Function ResolveSafeFaction()
+	If SafeFaction
+		Return SafeFaction
+	EndIf
+	; PTX_TrainingDummyFaction (0x804) — crime-immune at every rank.
+	SafeFaction = Game.GetFormFromFile(0x804, "PTX_TrainingDummy.esp") as Faction
+	Return SafeFaction
+EndFunction
+
+Function SetFactionMembership(Actor dummy, Faction akFaction, Bool wantIn)
+	If !dummy || !akFaction
+		Return
+	EndIf
+	Bool inFaction = dummy.IsInFaction(akFaction)
+	If wantIn && !inFaction
+		dummy.AddToFaction(akFaction)
+	ElseIf !wantIn && inFaction
+		dummy.RemoveFromFaction(akFaction)
+	EndIf
+EndFunction
+
 Function ConfigureDummy(Actor dummy)
 	If !dummy
 		Return
@@ -301,16 +336,27 @@ Function ConfigureDummy(Actor dummy)
 	dummy.SetLevel(level)
 	dummy.SetActorValue("Health", maxHp)
 	dummy.RestoreActorValue("Health", maxHp)
+	; No town crime faction — assault on a dummy must not bounty the player.
+	dummy.SetCrimeFaction(None)
 	Actor player = Game.GetPlayer()
+	Int rank = RelationshipRank
+	If rank < -4
+		rank = -4
+	ElseIf rank > 3
+		rank = 3
+	EndIf
 	If player
-		Int rank = RelationshipRank
-		If rank < -4
-			rank = -4
-		ElseIf rank > 3
-			rank = 3
-		EndIf
 		dummy.SetRelationshipRank(player, rank)
 	EndIf
+	; Drop BanditFaction from 0.3.4 if still attached (guards attacked those).
+	Faction bandit = Game.GetFormFromFile(0x1BCC0, "Skyrim.esm") as Faction
+	If bandit && dummy.IsInFaction(bandit)
+		dummy.RemoveFromFaction(bandit)
+	EndIf
+	; Always crime-immune. Enemy / Archnemesis also get the player-hostile faction
+	; so harmful Spell auras pass IsHostileToActor without involving guards.
+	SetFactionMembership(dummy, ResolveSafeFaction(), True)
+	SetFactionMembership(dummy, ResolveHostileFaction(), rank <= -3)
 EndFunction
 
 Function GiveStartingGear(Actor dummy)

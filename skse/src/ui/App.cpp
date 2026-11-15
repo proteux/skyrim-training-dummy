@@ -181,7 +181,7 @@ namespace tdui::ui {
             }
             EndCombo();
         }
-        TextDisabled("Enemy or Archnemesis for harmful Spell auras (IsHostileToActor).");
+        TextDisabled("Enemy / Archnemesis: player-hostile faction so Spell auras hit them.");
 
         if (Checkbox("Mute hit notifications", &settings_.muteNotifications)) {
             settingsDirty = true;

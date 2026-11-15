@@ -155,6 +155,52 @@ questAdapter.Aliases.Add(MakeAliasFrag(1));
 quest.VirtualMachineAdapter = questAdapter;
 mod.Quests.Add(quest);
 
+// --- Factions 0x803 / 0x804 ---
+// Crime-ignore flags: hexing / hitting a dummy must not become town assault
+// (that turns guards hostile, then a harmful Spell aura starts hitting them).
+var dummyCrimeFlags = Faction.FactionFlag.HiddenFromPC
+    | Faction.FactionFlag.IgnoreAssault
+    | Faction.FactionFlag.IgnoreMurder
+    | Faction.FactionFlag.IgnoreStealing
+    | Faction.FactionFlag.IgnoreTrespass
+    | Faction.FactionFlag.IgnorePickpocket
+    | Faction.FactionFlag.DoNotReportCrimesAgainstMembers;
+
+// 0x803: Enemy rank only — enemy to PlayerFaction so IsHostileToActor works;
+// not related to guard/town factions, so guards don't attack the dummy.
+var hostileFaction = new Faction(F(0x803), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyHostileFaction",
+    Name = "Training Dummy Hostile",
+    Flags = dummyCrimeFlags,
+};
+var playerEnemy = new Relation { Reaction = CombatReaction.Enemy };
+playerEnemy.Target.SetTo(new FormKey(skyrim, 0xDB1)); // PlayerFaction
+hostileFaction.Relations.Add(playerEnemy);
+mod.Factions.Add(hostileFaction);
+
+// 0x804: every dummy, every rank — crime-immune even when not "Enemy".
+var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyFaction",
+    Name = "Training Dummy",
+    Flags = dummyCrimeFlags,
+};
+mod.Factions.Add(safeFaction);
+
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "HostileFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(hostileFaction.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "SafeFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(safeFaction.FormKey),
+});
+
 // --- NPCs 0x801 / 0x802 ---
 // Male: civilian Nord (Alvor). Female: EncBandit Nord — CBBE/naked body path
 // works; Ysolda-unique clones went solid black when undressed. FaceGen heads
@@ -342,7 +388,9 @@ Console.WriteLine($"Wrote {seqPath} ({seqFormId:X8})");
 
 using var check = SkyrimMod.CreateFromBinaryOverlay(outputPath, SkyrimRelease.SkyrimSE);
 Console.WriteLine($"Light {check.IsSmallMaster}, masters: " + string.Join(", ", check.ModHeader.MasterReferences.Select(m => m.Master.ToString())));
-Console.WriteLine($"Quests {check.Quests.Count}, Npcs {check.Npcs.Count}, Spells {check.Spells.Count}, MGEFs {check.MagicEffects.Count}, Activators {check.Activators.Count}, Explosions {check.Explosions.Count}");
+Console.WriteLine($"Quests {check.Quests.Count}, Npcs {check.Npcs.Count}, Factions {check.Factions.Count}, Spells {check.Spells.Count}, MGEFs {check.MagicEffects.Count}, Activators {check.Activators.Count}, Explosions {check.Explosions.Count}");
+foreach (var f in check.Factions)
+    Console.WriteLine($"  FACT {f.EditorID} flags={f.Flags} relations={f.Relations.Count} reaction0={f.Relations.FirstOrDefault()?.Reaction}");
 foreach (var n in check.Npcs)
     Console.WriteLine($"  NPC {n.EditorID} female={n.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Female)} essential={n.Configuration.Flags.HasFlag(NpcConfiguration.Flag.Essential)} factions={n.Factions.Count} aggression={n.AIData?.Aggression}");
 foreach (var s in check.Spells)

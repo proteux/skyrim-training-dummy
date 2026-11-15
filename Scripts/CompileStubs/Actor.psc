@@ -18,4 +18,8 @@ Int Function AddItem(Form akItem, Int aiCount = 1, Bool abSilent = False) native
 Function EquipItem(Form akItem, Bool abPreventRemoval = False, Bool abSilent = False) native
 Function UnequipAll() native
 Function SetRelationshipRank(Actor akOther, Int aiRank) native
+Function AddToFaction(Faction akFaction) native
+Function RemoveFromFaction(Faction akFaction) native
+Bool Function IsInFaction(Faction akFaction) native
+Function SetCrimeFaction(Faction akFaction) native
 ActorBase Function GetActorBase() native

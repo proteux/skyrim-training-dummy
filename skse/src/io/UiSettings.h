@@ -10,7 +10,7 @@ namespace tdui::io {
         int level = 1;
         float healthPerLevel = 50.0f;
         bool muteNotifications = true;
-        // Toward the player: -4 Archnemesis … 3 Lover (default). Use -3 Enemy for harmful Spell auras.
+        // Toward the player: -4 Archnemesis … 3 Lover (default). Enemy/Archnemesis join a player-only hostile faction for IsHostileToActor.
         int relationshipRank = 3;
 
         void Load(const std::filesystem::path& path);

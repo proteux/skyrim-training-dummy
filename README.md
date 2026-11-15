@@ -30,7 +30,7 @@ Open the Mod Control Panel (default hotkey from Menu Framework) → **Training D
 - Summon / dismiss / add or remove spells / heal now
 - **Match player level** (default on), or set a fixed level
 - **Health per level** (default **50**): max HP = level × this
-- **vs player** relationship (default Lover): set **Enemy** or **Archnemesis** so harmful Spell auras hit them (`IsHostileToActor`)
+- **vs player** relationship (default Lover): set **Enemy** or **Archnemesis** so harmful Spell auras hit them (`IsHostileToActor` via a custom faction that’s only enemy to the player). Hitting or hexing a dummy does not report as assault, so town guards stay out of it; dummies stay Unaggressive.
 - Rolling combat log with 5s / 10s DPS
 - Mute hit notifications (default on; hits still go to the log)
 
@@ -44,7 +44,7 @@ SKSE plugin log:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/TrainingDummyUI.log`
 
-The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit). Harmful MTF spell auras that require hostility will not hit this dummy; use a real enemy for those.
+The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Bandit gear is in their inventory (not an outfit). With **Enemy** or **Archnemesis**, harmful MTF Spell auras that check `IsHostileToActor` hit them; other ranks stay friendly for blessing-style tests.
 
 ## Faces
 

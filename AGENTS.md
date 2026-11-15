@@ -21,4 +21,4 @@
 
 - Papyrus + Mutagen ESP: repo root (`Scripts/`, `tools/PluginGen/`)
 - SKSE Menu Framework UI: `skse/` → `TrainingDummyUI.dll`
-- FormIDs are stable (`0x800` quest, `0x801`/`0x802` NPCs, `0x808`/`0x80A`/`0x80C` spells). Never move them.
+- FormIDs are stable (`0x800` quest, `0x801`/`0x802` NPCs, `0x803` hostile faction, `0x804` safe/crime-immune faction, `0x808`/`0x80A`/`0x80C` spells). Never move them.
