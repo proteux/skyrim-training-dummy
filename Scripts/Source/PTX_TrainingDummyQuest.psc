@@ -177,14 +177,18 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	ConfigureDummy(dummy)
 	slot.ForceRefTo(dummy)
 	ResetAliasHealthTracking(slot)
+	StartAliasPinWatch(slot, dummy)
 
 	Utility.Wait(0.25)
 	GiveStartingGear(dummy)
+	; Gear equip can shove packages; re-pin and refresh the spawn anchor.
+	ConfigureDummy(dummy)
+	StartAliasPinWatch(slot, dummy)
 
 	Int level = EffectiveLevel()
 	Float maxHp = EffectiveMaxHealth()
 	Debug.OpenUserLog("TrainingDummy")
-	String line = "--- summon level=" + level + " hp=" + (maxHp as Int) + " base=" + akBase.GetName() + " ---"
+	String line = "--- summon want=" + level + " get=" + dummy.GetLevel() + " hp=" + (maxHp as Int) + " base=" + akBase.GetName() + " ---"
 	Debug.TraceUser("TrainingDummy", line)
 	TrainingDummyUI.LogLine(line)
 	Notify("Training Dummy summoned.")
@@ -200,6 +204,10 @@ EndFunction
 Function ClearAlias(ReferenceAlias slot)
 	If !slot
 		Return
+	EndIf
+	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
+	If typed
+		typed.StopPinWatch()
 	EndIf
 	Actor dummy = slot.GetActorReference()
 	If dummy
@@ -232,10 +240,12 @@ Function ReassertLiveDummy()
 	If male
 		ConfigureDummy(male)
 		ResetAliasHealthTracking(MaleAlias)
+		StartAliasPinWatch(MaleAlias, male)
 	EndIf
 	If female
 		ConfigureDummy(female)
 		ResetAliasHealthTracking(FemaleAlias)
+		StartAliasPinWatch(FemaleAlias, female)
 	EndIf
 EndFunction
 
@@ -243,6 +253,14 @@ Function ResetAliasHealthTracking(ReferenceAlias slot)
 	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
 	If typed
 		typed.SyncFromQuest()
+	EndIf
+EndFunction
+
+Function StartAliasPinWatch(ReferenceAlias slot, Actor dummy)
+	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
+	If typed
+		typed.RememberAnchor(dummy)
+		typed.EnsurePinWatch(dummy)
 	EndIf
 EndFunction
 
@@ -333,7 +351,7 @@ Function ConfigureDummy(Actor dummy)
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetRestrained(True)
-	dummy.SetLevel(level)
+	TrainingDummyUI.SetActorLevel(dummy, level)
 	dummy.SetActorValue("Health", maxHp)
 	dummy.RestoreActorValue("Health", maxHp)
 	; No town crime faction — assault on a dummy must not bounty the player.

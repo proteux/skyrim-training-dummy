@@ -7,4 +7,8 @@ Function Delete() native
 String Function GetDisplayName() native
 Float Function GetAngleZ() native
 Function SetAngle(Float afXAngle, Float afYAngle, Float afZAngle) native
+Float Function GetPositionX() native
+Float Function GetPositionY() native
+Float Function GetPositionZ() native
+Function SetPosition(Float afX, Float afY, Float afZ) native
 Function MoveTo(ObjectReference akTarget, Float afXOffset = 0.0, Float afYOffset = 0.0, Float afZOffset = 0.0, Bool abMatchRotation = True) native

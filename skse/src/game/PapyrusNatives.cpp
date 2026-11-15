@@ -21,9 +21,28 @@ namespace tdui::game {
             CombatLog::Get().Push(damage, std::move(text));
         }
 
+        void SetActorLevel(RE::StaticFunctionTag*, RE::Actor* actor, std::int32_t level) {
+            if (!actor) {
+                return;
+            }
+            level = std::clamp(level, 1, 10000);
+            auto* npc = actor->GetActorBase();
+            if (!npc) {
+                logger::warn("SetActorLevel: no actor base for {:08X}", actor->GetFormID());
+                return;
+            }
+            // Fixed level (not PC×mult). Unique dummy bases are safe to mutate;
+            // only one male / female instance uses each FormID.
+            npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kPCLevelMult);
+            npc->actorData.level = static_cast<std::uint16_t>(level);
+            npc->actorData.calcLevelMin = 0;
+            npc->actorData.calcLevelMax = 0;
+        }
+
         bool Register(RE::BSScript::IVirtualMachine* vm) {
             vm->RegisterFunction("LogLine", kScript, LogLine);
             vm->RegisterFunction("LogHit", kScript, LogHit);
+            vm->RegisterFunction("SetActorLevel", kScript, SetActorLevel);
             logger::info("Registered Papyrus natives on {}", kScript);
             return true;
         }

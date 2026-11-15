@@ -58,6 +58,11 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
     npc.Configuration.Flags |= NpcConfiguration.Flag.Essential
         | NpcConfiguration.Flag.Unique
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
+    // Alvor is fixed lv10, EncBandit lv1 — normalize so both start equal.
+    // Runtime TrainingDummyUI.SetActorLevel overwrites this to the UI level.
+    npc.Configuration.Level = new NpcLevel { Level = 1 };
+    npc.Configuration.CalcMinLevel = 0;
+    npc.Configuration.CalcMaxLevel = 0;
     npc.Factions.Clear();
     npc.Packages.Clear();
     // Drop faction keywords so SPID / outfit distributors don't force unpickable gear.

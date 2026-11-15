@@ -12,6 +12,15 @@ Int PosturePassesLeft = 0
 Float Property CombatIdleSeconds = 3.0 Auto
 Float LastDamageRealTime = 0.0
 Bool WatchingCombat = False
+; Enemy-rank combat packages clear DontMove; keep pinning while the alias is filled.
+Float Property PinInterval = 0.25 Auto
+Float Property SnapDistance = 24.0 Auto
+Bool PinWatchActive = False
+Bool HasAnchor = False
+Float AnchorX = 0.0
+Float AnchorY = 0.0
+Float AnchorZ = 0.0
+Float AnchorAngleZ = 0.0
 
 Function SyncFromQuest()
 	If DummyQuest
@@ -25,11 +34,50 @@ Function SyncFromQuest()
 		If remaining > 0.0
 			LastHealth = remaining
 		EndIf
+		EnsurePinWatch(dummy)
 	EndIf
 EndFunction
 
 Function ResetHealthTracking()
 	SyncFromQuest()
+EndFunction
+
+; Quest calls this after ForceRefTo / ConfigureDummy so the loop starts immediately.
+Function EnsurePinWatch(Actor dummy = None)
+	If !dummy
+		dummy = GetActorReference()
+	EndIf
+	If !dummy
+		StopPinWatch()
+		Return
+	EndIf
+	If !HasAnchor
+		RememberAnchor(dummy)
+	EndIf
+	PinInPlace(dummy)
+	If !PinWatchActive
+		PinWatchActive = True
+		RegisterForSingleUpdate(PinInterval)
+	EndIf
+EndFunction
+
+Function StopPinWatch()
+	PinWatchActive = False
+	WatchingCombat = False
+	PosturePassesLeft = 0
+	HasAnchor = False
+	UnregisterForUpdate()
+EndFunction
+
+Function RememberAnchor(Actor dummy)
+	If !dummy
+		Return
+	EndIf
+	AnchorX = dummy.GetPositionX()
+	AnchorY = dummy.GetPositionY()
+	AnchorZ = dummy.GetPositionZ()
+	AnchorAngleZ = dummy.GetAngleZ()
+	HasAnchor = True
 EndFunction
 
 Event OnLoad()
@@ -117,9 +165,12 @@ EndEvent
 
 Event OnUpdate()
 	Actor dummy = GetActorReference()
-	If dummy
-		PinInPlace(dummy)
+	If !dummy
+		StopPinWatch()
+		Return
 	EndIf
+
+	PinInPlace(dummy)
 
 	If WatchingCombat
 		Float idleFor = Utility.GetCurrentRealTime() - LastDamageRealTime
@@ -128,9 +179,7 @@ Event OnUpdate()
 			need = 0.5
 		EndIf
 		If idleFor >= need
-			If dummy
-				dummy.StopCombat()
-			EndIf
+			dummy.StopCombat()
 			WatchingCombat = False
 			String line = "--- combat calm after " + (need as Int) + "s idle ---"
 			Debug.TraceUser("TrainingDummy", line)
@@ -142,12 +191,17 @@ Event OnUpdate()
 		PosturePassesLeft -= 1
 	EndIf
 
-	If WatchingCombat || PosturePassesLeft > 0
-		RegisterForSingleUpdate(0.5)
+	If PinWatchActive || WatchingCombat || PosturePassesLeft > 0
+		Float interval = PinInterval
+		If interval < 0.1
+			interval = 0.1
+		EndIf
+		RegisterForSingleUpdate(interval)
 	EndIf
 EndEvent
 
 ; Pin without breaking combat — restrained stops the run-in-place.
+; Snap back if combat packages shoved them off the spawn spot.
 Function PinInPlace(Actor dummy)
 	If !dummy
 		Return
@@ -155,23 +209,42 @@ Function PinInPlace(Actor dummy)
 	dummy.EnableAI(True)
 	dummy.SetDontMove(True)
 	dummy.SetRestrained(True)
+	If HasAnchor
+		Float dx = dummy.GetPositionX() - AnchorX
+		Float dy = dummy.GetPositionY() - AnchorY
+		Float dz = dummy.GetPositionZ() - AnchorZ
+		Float limit = SnapDistance
+		If limit < 8.0
+			limit = 8.0
+		EndIf
+		If (dx * dx) + (dy * dy) + (dz * dz) > (limit * limit)
+			dummy.SetPosition(AnchorX, AnchorY, AnchorZ)
+			dummy.SetAngle(0.0, 0.0, AnchorAngleZ)
+			dummy.SetDontMove(True)
+			dummy.SetRestrained(True)
+		EndIf
+	EndIf
 EndFunction
 
 Function NoteDamage()
 	LastDamageRealTime = Utility.GetCurrentRealTime()
 	WatchingCombat = True
-	RegisterForSingleUpdate(0.5)
+	If !PinWatchActive
+		RegisterForSingleUpdate(PinInterval)
+	EndIf
 EndFunction
 
-; Summon / reassert: pin and clear any leftover combat.
+; Summon / reassert: pin, remember spawn spot, and clear any leftover combat.
 Function HoldStill(Actor dummy)
 	If !dummy
 		Return
 	EndIf
 	dummy.StopCombat()
+	RememberAnchor(dummy)
 	PinInPlace(dummy)
 	WatchingCombat = False
 	PosturePassesLeft = 0
+	EnsurePinWatch(dummy)
 EndFunction
 
 Function Configure()
@@ -191,7 +264,7 @@ Function Configure()
 	MaxHealth = maxHp
 	dummy.SetGhost(False)
 	HoldStill(dummy)
-	dummy.SetLevel(level)
+	TrainingDummyUI.SetActorLevel(dummy, level)
 	dummy.SetActorValue("Health", maxHp)
 	dummy.RestoreActorValue("Health", maxHp)
 	LastHealth = maxHp
