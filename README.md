@@ -58,4 +58,11 @@ Male: no FaceGen override — uses the EncBandit Nord default head.
 
 - Mutagen `tools/PluginGen`, Papyrus under `Scripts/Source`, SKSE UI under `skse/`
 - `make live` installs into `SKYRIM_DIR` (default Steam SSE path)
+- `make package` writes `dist/PTX_TrainingDummy-<version>.zip` for Nexus
 - Override with `SKYRIM_DIR`, `PAPYRUS_COMPILER`, `PLUGINS_TXT`, or `VCPKG_ROOT`
+
+## License
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See [`LICENSE`](LICENSE) for the full text of the GPL-3.0.
+
+The release zip includes the license and this notice as `SKSE/Plugins/TrainingDummyUI/LICENSE.txt` and `README.txt`.

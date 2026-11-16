@@ -12,6 +12,7 @@
 ## Building
 
 - **Install with `make live`** (plain `make` does the same). It builds the SKSE DLL, compiles Papyrus, regenerates the ESP, and copies into the game's `Data` folder.
+- `make package` writes the Nexus zip under `dist/` (includes `LICENSE.txt` / `README.txt` under `SKSE/Plugins/TrainingDummyUI`).
 - Skyrim locks `TrainingDummyUI.dll` (and the ESP) while it runs. `make live` exits with a quit message if the DLL is locked — ask the user to quit to desktop, then retry.
 - Needs `VCPKG_ROOT` (same as Magic Tattoos UI). Optional `build.local.sh` for path overrides.
 - The C++ build tree lives on `G:/CursorBuilds/skyrim-training-dummy-ui/` (M: is often full). Override with `TDUI_BUILD_DIR` if needed.

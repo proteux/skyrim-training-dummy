@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage: build.sh [live|build|uninstall-live], default live
+# Usage: build.sh [live|build|package|uninstall-live], default live
 # Environment overrides: SKYRIM_DIR, PAPYRUS_COMPILER, PLUGINS_TXT, NUGET_PACKAGES, VCPKG_ROOT
 set -euo pipefail
 
@@ -93,7 +93,7 @@ skyrim_holds_dll() {
 }
 
 case "$TARGET" in
-  live|build) ;;
+  live|build|package) ;;
   uninstall-live)
     remove_from "$DATA"
     echo "Removed $ESP_BASE / $DLL_NAME from $DATA"
@@ -101,7 +101,7 @@ case "$TARGET" in
     exit 0
     ;;
   *)
-    echo "Unknown target '$TARGET'. Use live, build, or uninstall-live." >&2
+    echo "Unknown target '$TARGET'. Use live, build, package, or uninstall-live." >&2
     exit 1
     ;;
 esac
@@ -202,7 +202,36 @@ echo "=== generating $ESP_BASE.esp ==="
 
 install_facegen "$DIST"
 
-[[ "$TARGET" == build ]] && { echo "Built $DIST"; exit 0; }
+mkdir -p "$DIST/SKSE/Plugins/TrainingDummyUI"
+cp -f "$HERE/LICENSE" "$DIST/SKSE/Plugins/TrainingDummyUI/LICENSE.txt"
+cp -f "$HERE/release/README.txt" "$DIST/SKSE/Plugins/TrainingDummyUI/README.txt"
+
+if [[ "$TARGET" == build ]]; then
+  echo "Built $DIST"
+  exit 0
+fi
+
+if [[ "$TARGET" == package ]]; then
+  PACKAGE="$DIST/package"
+  ZIP="$DIST/$ESP_BASE-$VERSION.zip"
+  rm -rf "$PACKAGE" "$ZIP"
+  mkdir -p "$PACKAGE"
+  cp -f "$DIST/$ESP_BASE.esp" "$PACKAGE/"
+  cp -rf "$DIST/Scripts" "$DIST/Seq" "$DIST/SKSE" "$PACKAGE/"
+  rm -f "$PACKAGE/SKSE/Plugins/$DLL_NAME.pdb"
+  if [[ -d "$DIST/$FACEGEOM_REL" || -d "$DIST/$FACETINT_REL" ]]; then
+    mkdir -p "$PACKAGE/$(dirname "$FACEGEOM_REL")" "$PACKAGE/$(dirname "$FACETINT_REL")"
+    [[ -d "$DIST/$FACEGEOM_REL" ]] && cp -rf "$DIST/$FACEGEOM_REL" "$PACKAGE/$(dirname "$FACEGEOM_REL")/"
+    [[ -d "$DIST/$FACETINT_REL" ]] && cp -rf "$DIST/$FACETINT_REL" "$PACKAGE/$(dirname "$FACETINT_REL")/"
+  fi
+  # Windows bsdtar, not Git Bash's GNU tar, which cannot write zips.
+  PACKAGE_ARGS=("$ESP_BASE.esp" Scripts Seq SKSE)
+  [[ -d "$PACKAGE/meshes" ]] && PACKAGE_ARGS+=(meshes)
+  [[ -d "$PACKAGE/textures" ]] && PACKAGE_ARGS+=(textures)
+  "$(cygpath -u "$SYSTEMROOT")/System32/tar.exe" -a -cf "$(cygpath -w "$ZIP")" -C "$(cygpath -w "$PACKAGE")" "${PACKAGE_ARGS[@]}"
+  echo "Packaged $VERSION at $ZIP"
+  exit 0
+fi
 
 mkdir -p "$DATA/Scripts/Source" "$DATA/Seq" "$DATA/SKSE/Plugins"
 install_facegen "$DATA"
