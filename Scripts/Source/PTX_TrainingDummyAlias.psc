@@ -186,7 +186,7 @@ Event OnUpdate()
 	EndIf
 
 	PinInPlace(dummy)
-	; CastAs / Spell aura apply effects without OnHit — catch HP drops here.
+	; CastAs / Cast an aura apply effects without OnHit — catch HP drops here.
 	; OOC HealRate is stripped by size (~0.7% max/s); real aura heals remain.
 	ReportHealthDrop(dummy, "aura/poll")
 
@@ -218,7 +218,7 @@ Event OnUpdate()
 	EndIf
 EndEvent
 
-; Logs damage or healing when HP changes without an OnHit (Spell aura CastAs path).
+; Logs damage or healing when HP changes without an OnHit (Cast an aura CastAs path).
 Function ReportHealthDrop(Actor dummy, String sourceName)
 	If !dummy
 		Return

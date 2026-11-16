@@ -259,7 +259,7 @@ namespace tdui::ui {
             }
             EndCombo();
         }
-        TextDisabled("Enemy / Archnemesis: faction-enemy to player so Spell auras hit them.");
+        TextDisabled("Ally/Friend: same side as player for Cast an aura on you; Enemy: hex-aura neighbour tests.");
 
         if (settingsDirty) {
             settings_.level = std::clamp(settings_.level, 1, 1000);

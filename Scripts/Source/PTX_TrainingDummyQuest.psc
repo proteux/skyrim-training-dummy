@@ -31,7 +31,7 @@ Float Property HealthStartPercent = 100.0 Auto
 Bool Property MuteNotifications = True Auto
 ; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) / Archnemesis also join
 ; HostileFaction (enemy only to PlayerFaction) so IsHostileToActor(player) is true
-; for harmful Spell auras without making town guards attack them. SafeFaction is
+; for harmful Cast an aura effects without making town guards attack them. SafeFaction is
 ; always applied so hitting / hexing a dummy does not report as town assault.
 Int Property RelationshipRank = 3 Auto
 Faction Property HostileFaction Auto
@@ -546,7 +546,7 @@ Function ConfigureDummy(Actor dummy)
 		dummy.RemoveFromFaction(bandit)
 	EndIf
 	; Always crime-immune. Enemy / Archnemesis also get the player-hostile faction
-	; so harmful Spell auras pass IsHostileToActor without involving guards.
+	; so harmful Cast an aura effects pass IsHostileToActor without involving guards.
 	SetFactionMembership(dummy, ResolveSafeFaction(), True)
 	SetFactionMembership(dummy, ResolveHostileFaction(), rank <= -3)
 EndFunction

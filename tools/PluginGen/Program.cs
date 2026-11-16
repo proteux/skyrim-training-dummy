@@ -195,7 +195,7 @@ mod.Quests.Add(quest);
 
 // --- Factions 0x803 / 0x804 ---
 // Crime-ignore flags: hexing / hitting a dummy must not become town assault
-// (that turns guards hostile, then a harmful Spell aura starts hitting them).
+// (that turns guards hostile, then a harmful Cast an aura starts hitting them).
 var dummyCrimeFlags = Faction.FactionFlag.HiddenFromPC
     | Faction.FactionFlag.IgnoreAssault
     | Faction.FactionFlag.IgnoreMurder
