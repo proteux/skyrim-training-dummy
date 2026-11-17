@@ -1,20 +1,17 @@
 ScriptName PTX_TrainingDummySummon extends ActiveMagicEffect
-{Self spell: spawn the configured dummy in front of the caster.}
+{Self spell: spawn the next free (or replace) slot for that gender.}
 
 PTX_TrainingDummyQuest Property DummyQuest Auto
-ActorBase Property DummyBase Auto
+Bool Property IsFemale Auto
 
 Event OnEffectStart(Actor akTarget, Actor akCaster)
-	Actor caster = akCaster
-	If !caster
-		caster = akTarget
+	If !DummyQuest
+		Debug.Notification("Training Dummy: summon missing quest.")
+		Return
 	EndIf
-	If !caster
-		caster = Game.GetPlayer()
-	EndIf
-	If DummyQuest && DummyBase && caster
-		DummyQuest.SpawnInFrontOf(caster, DummyBase)
+	If IsFemale
+		DummyQuest.SummonFemale()
 	Else
-		Debug.Notification("Training Dummy: summon missing quest or base.")
+		DummyQuest.SummonMale()
 	EndIf
 EndEvent

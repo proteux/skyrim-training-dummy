@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Sync RaceMenu CharGen exports into FaceGen paths for PTX_TrainingDummy.
 
-Female only: Female_Dummy -> FaceGen 00000802. Male uses the EncBandit default
-head (no FaceGen override), so Male_Dummy CharGen exports are ignored and any
-leftover 00000801 FaceGen files are removed from repo Data.
+Female only: Female_Dummy is copied to every female slot FormID
+(00000802 / 0000080D / 0000080E). Male uses the EncBandit default head (no
+FaceGen override), so Male_Dummy CharGen exports are ignored and leftover male
+FaceGen files are removed from repo Data.
 
 Also writes CharGen/<Name>.nif.dds — RaceMenu embeds that tint path inside the .nif,
 so FaceGen heads stay colored without NifSkope path rewriting.
@@ -16,11 +17,10 @@ import sys
 from pathlib import Path
 
 ESP = "PTX_TrainingDummy.esp"
-# Male (00000801) intentionally omitted — default EncBandit head.
-PAIRS = (
-    ("Female_Dummy", "00000802"),
-)
-MALE_FORM_ID = "00000801"
+FEMALE_STEM = "Female_Dummy"
+# Slot 0 / 1 / 2 — same CharGen export until distinct heads exist.
+FEMALE_FORM_IDS = ("00000802", "0000080D", "0000080E")
+MALE_FORM_IDS = ("00000801", "00000805", "00000806")
 
 
 def sync(data: Path, repo_data: Path) -> int:
@@ -34,29 +34,28 @@ def sync(data: Path, repo_data: Path) -> int:
     geom_repo.mkdir(parents=True, exist_ok=True)
     tint_repo.mkdir(parents=True, exist_ok=True)
 
-    for path in (geom_repo / f"{MALE_FORM_ID}.nif", tint_repo / f"{MALE_FORM_ID}.dds"):
-        if path.is_file():
-            path.unlink()
-            print(f"Removed male FaceGen override {path.name}")
+    for form_id in MALE_FORM_IDS:
+        for path in (geom_repo / f"{form_id}.nif", tint_repo / f"{form_id}.dds"):
+            if path.is_file():
+                path.unlink()
+                print(f"Removed male FaceGen override {path.name}")
 
-    missing = False
-    for stem, form_id in PAIRS:
-        nif = chargen / f"{stem}.nif"
-        dds = chargen / f"{stem}.dds"
-        if not nif.is_file() or not dds.is_file():
-            print(f"Missing {nif.name} and/or {dds.name} in CharGen", file=sys.stderr)
-            missing = True
-            continue
+    nif = chargen / f"{FEMALE_STEM}.nif"
+    dds = chargen / f"{FEMALE_STEM}.dds"
+    if not nif.is_file() or not dds.is_file():
+        print(f"Missing {nif.name} and/or {dds.name} in CharGen", file=sys.stderr)
+        return 1
 
-        # RaceMenu nif references CharGen\<stem>.nif.dds for the tintmask.
-        nif_dds = chargen / f"{stem}.nif.dds"
-        shutil.copy2(dds, nif_dds)
+    # RaceMenu nif references CharGen\<stem>.nif.dds for the tintmask.
+    nif_dds = chargen / f"{FEMALE_STEM}.nif.dds"
+    shutil.copy2(dds, nif_dds)
 
+    for form_id in FEMALE_FORM_IDS:
         shutil.copy2(nif, geom_repo / f"{form_id}.nif")
         shutil.copy2(dds, tint_repo / f"{form_id}.dds")
-        print(f"Synced {stem} -> {form_id} (+ {nif_dds.name})")
+        print(f"Synced {FEMALE_STEM} -> {form_id} (+ {nif_dds.name})")
 
-    return 1 if missing else 0
+    return 0
 
 
 def main() -> int:

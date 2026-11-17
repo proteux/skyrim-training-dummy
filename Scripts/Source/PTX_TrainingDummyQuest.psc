@@ -43,6 +43,8 @@ Bool Property MuteNotifications = True Auto
 Int Property RelationshipRank = 3 Auto
 Faction Property HostileFaction Auto
 Faction Property SafeFaction Auto
+; Cross-faction Ally with SafeFaction so GetFactionReaction between dummies is Ally.
+Faction Property PackFaction Auto
 
 Event OnInit()
 	RegisterForSingleUpdate(2.0)
@@ -146,7 +148,7 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 	EndIf
 EndFunction
 
-; Shared ActorBase Essential flag — all live copies of that base share it.
+; Essential is per ActorBase — each slot has its own base.
 Function ApplyImmortality(Actor dummy)
 	If !dummy
 		Return
@@ -213,7 +215,7 @@ Bool Function PlayerHasSpells()
 	Return player.HasSpell(SummonMaleSpell)
 EndFunction
 
-; Slot 0/1/2 → distinct spellings (shared ActorBase can't hold three FULL names).
+; Slot 0/1/2 → distinct spellings (also set on each base's FULL as fallback).
 String Function NameForSlot(Bool abFemale, Int aiIndex)
 	If abFemale
 		If aiIndex == 0
@@ -231,61 +233,91 @@ String Function NameForSlot(Bool abFemale, Int aiIndex)
 	Return "Shaun"
 EndFunction
 
+; Males 0x801/0x805/0x806; females 0x802/0x80D/0x80E — one base per slot.
+ActorBase Function BaseForSlot(Bool abFemale, Int aiIndex)
+	Int formId = 0
+	If abFemale
+		If aiIndex == 0
+			formId = 0x802
+		ElseIf aiIndex == 1
+			formId = 0x80D
+		ElseIf aiIndex == 2
+			formId = 0x80E
+		EndIf
+	Else
+		If aiIndex == 0
+			formId = 0x801
+		ElseIf aiIndex == 1
+			formId = 0x805
+		ElseIf aiIndex == 2
+			formId = 0x806
+		EndIf
+	EndIf
+	If formId == 0
+		Return None
+	EndIf
+	Return Game.GetFormFromFile(formId, "PTX_TrainingDummy.esp") as ActorBase
+EndFunction
+
 Function SummonMale()
-	ActorBase base = Game.GetFormFromFile(0x801, "PTX_TrainingDummy.esp") as ActorBase
 	Actor player = Game.GetPlayer()
-	If player && base
-		SpawnInFrontOf(player, base)
+	If player
+		SpawnInFrontOf(player, False)
 	EndIf
 EndFunction
 
 Function SummonFemale()
-	ActorBase base = Game.GetFormFromFile(0x802, "PTX_TrainingDummy.esp") as ActorBase
 	Actor player = Game.GetPlayer()
-	If player && base
-		SpawnInFrontOf(player, base)
+	If player
+		SpawnInFrontOf(player, True)
 	EndIf
 EndFunction
 
-Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
-	If !akCaster || !akBase
+Function SpawnInFrontOf(Actor akCaster, Bool abFemale)
+	If !akCaster
 		Return
 	EndIf
 
-	Bool female = akBase.GetSex() == 1
 	; Empty slot first; if full (alive or dead), clear and reuse the next replace slot.
-	Int slotIndex = ClaimSummonSlot(female)
+	Int slotIndex = ClaimSummonSlot(abFemale)
 	If slotIndex < 0
 		Notify("Training Dummy: no free slot (busy).")
 		Return
 	EndIf
 
-	ReferenceAlias slot = SlotAt(female, slotIndex)
+	ActorBase akBase = BaseForSlot(abFemale, slotIndex)
+	If !akBase
+		SetSlotReserved(abFemale, slotIndex, False)
+		Notify("Training Dummy: missing ActorBase for slot.")
+		Return
+	EndIf
+
+	ReferenceAlias slot = SlotAt(abFemale, slotIndex)
 	If !slot
-		SetSlotReserved(female, slotIndex, False)
+		SetSlotReserved(abFemale, slotIndex, False)
 		Notify("Training Dummy: no alias for that slot.")
 		Return
 	EndIf
 
 	Actor dummy = akCaster.PlaceActorAtMe(akBase)
 	If !dummy
-		SetSlotReserved(female, slotIndex, False)
+		SetSlotReserved(abFemale, slotIndex, False)
 		Notify("Training Dummy: PlaceActorAtMe failed.")
 		Return
 	EndIf
 
-	; Shared bases / reused FormIDs can keep leftover MTF overlays — scrub before use.
+	; Reused FormIDs can keep leftover MTF overlays — scrub before use.
 	ClearMagicTattoos(dummy)
 
 	; Claim the alias before MoveTo / Configure so a parallel summon cannot reuse it,
 	; and so pin/heal tracking attaches even if later steps hitch.
 	slot.ForceRefTo(dummy)
-	SetSlotReserved(female, slotIndex, False)
+	SetSlotReserved(abFemale, slotIndex, False)
 
 	; Fan left (male) / right (female); later slots step farther out and slightly forward.
 	Float az = akCaster.GetAngleZ()
 	Float sideSign = 1.0
-	If !female
+	If !abFemale
 		sideSign = -1.0
 	EndIf
 	Float side = sideSign * SideOffset * (1.0 + (slotIndex as Float) * 2.0)
@@ -295,7 +327,7 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	dummy.MoveTo(akCaster, x, y, 0.0, True)
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
-	TrainingDummyUI.SetDisplayName(dummy, NameForSlot(female, slotIndex))
+	TrainingDummyUI.SetDisplayName(dummy, NameForSlot(abFemale, slotIndex))
 	ConfigureDummy(dummy)
 	ResetAliasHealthTracking(slot)
 	StartAliasPinWatch(slot, dummy)
@@ -339,7 +371,7 @@ Function ClearAlias(ReferenceAlias slot)
 EndFunction
 
 ; Soft dep on Magic Tattoos Framework — drop presets, overlays, and tracking so the
-; next PlaceActorAtMe of the shared base is blank.
+; next PlaceActorAtMe of that slot's base is blank.
 Function ClearMagicTattoos(Actor akDummy)
 	If !akDummy
 		Return
@@ -621,6 +653,15 @@ Faction Function ResolveSafeFaction()
 	Return SafeFaction
 EndFunction
 
+Faction Function ResolvePackFaction()
+	If PackFaction
+		Return PackFaction
+	EndIf
+	; PTX_TrainingDummyPackFaction (0x80F) — Ally with SafeFaction for pack GetFactionReaction.
+	PackFaction = Game.GetFormFromFile(0x80F, "PTX_TrainingDummy.esp") as Faction
+	Return PackFaction
+EndFunction
+
 Function SetFactionMembership(Actor dummy, Faction akFaction, Bool wantIn)
 	If !dummy || !akFaction
 		Return
@@ -668,9 +709,10 @@ Function ConfigureDummy(Actor dummy)
 	If bandit && dummy.IsInFaction(bandit)
 		dummy.RemoveFromFaction(bandit)
 	EndIf
-	; Always crime-immune. Enemy / Archnemesis also get the player-hostile faction
-	; so harmful Cast an aura effects pass IsHostileToActor without involving guards.
+	; Always crime-immune + pack Ally pair (Safe+Pack). Enemy / Archnemesis also get
+	; the player-hostile faction so IsHostileToActor works without involving guards.
 	SetFactionMembership(dummy, ResolveSafeFaction(), True)
+	SetFactionMembership(dummy, ResolvePackFaction(), True)
 	SetFactionMembership(dummy, ResolveHostileFaction(), rank <= -3)
 EndFunction
 

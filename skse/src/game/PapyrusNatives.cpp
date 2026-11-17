@@ -35,15 +35,15 @@ namespace tdui::game {
                 logger::warn("SetActorLevel: no actor base for {:08X}", actor->GetFormID());
                 return;
             }
-            // Fixed level (not PC×mult). Bases are shared by up to 3 instances each;
-            // mutating level on the ActorBase is intentional for these dummy FormIDs.
+            // Fixed level (not PC×mult). One ActorBase per slot; mutating level on
+            // that base is intentional for these dummy FormIDs.
             npc->actorData.actorBaseFlags.reset(RE::ACTOR_BASE_DATA::Flag::kPCLevelMult);
             npc->actorData.level = static_cast<std::uint16_t>(level);
             npc->actorData.calcLevelMin = 0;
             npc->actorData.calcLevelMax = 0;
         }
 
-        // Per-instance name: shared ActorBases can't hold distinct FULL names.
+        // Per-instance display name (slot spellings); base FULL stays generic.
         void SetDisplayName(RE::StaticFunctionTag*, RE::Actor* actor, RE::BSFixedString name) {
             if (!actor || !name.c_str() || name.c_str()[0] == '\0') {
                 return;

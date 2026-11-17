@@ -22,4 +22,4 @@
 
 - Papyrus + Mutagen ESP: repo root (`Scripts/`, `tools/PluginGen/`)
 - SKSE Menu Framework UI: `skse/` → `TrainingDummyUI.dll`
-- FormIDs are stable (`0x800` quest, `0x801`/`0x802` NPCs, `0x803` hostile faction, `0x804` safe/crime-immune faction, `0x808`/`0x80A`/`0x80C` spells). Never move them. Quest aliases 0–2 are male slots, 3–5 female (cap 3 per gender).
+- FormIDs are stable (`0x800` quest; male NPCs `0x801`/`0x805`/`0x806`; female NPCs `0x802`/`0x80D`/`0x80E`; `0x803` hostile faction, `0x804` safe/crime-immune faction, `0x80F` pack Ally faction, `0x808`/`0x80A`/`0x80C` spells). Never move them. One ActorBase per slot so outfits (Dress Up Lover’s, etc.) stay independent. Quest aliases 0–2 are male slots, 3–5 female (cap 3 per gender).

@@ -56,10 +56,10 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         | NpcConfiguration.Flag.Invulnerable
         | NpcConfiguration.Flag.IsGhost
         | NpcConfiguration.Flag.Summonable);
-    // Not Unique — up to three live instances share each base (0x801 / 0x802).
+    // One live instance per base (slot). Not Unique — PlaceActorAtMe + Delete.
     npc.Configuration.Flags |= NpcConfiguration.Flag.Essential
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
-    // EncBandit templates are lv1 — keep both bases equal before runtime level.
+    // EncBandit templates are lv1 — keep all bases equal before runtime level.
     // Runtime TrainingDummyUI.SetActorLevel overwrites this to the UI level.
     npc.Configuration.Level = new NpcLevel { Level = 1 };
     npc.Configuration.CalcMinLevel = 0;
@@ -226,6 +226,23 @@ var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
 };
 mod.Factions.Add(safeFaction);
 
+// 0x80F: second pack faction. GetFactionReaction returns Neutral for two actors who
+// only share one faction; Ally/Friend need a cross-faction relation. Every dummy is
+// in Safe + Pack with Ally both ways, so packmates read as Ally (not town Neutral).
+var packFaction = new Faction(F(0x80F), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyPackFaction",
+    Name = "Training Dummy Pack",
+    Flags = dummyCrimeFlags,
+};
+var safeAllyPack = new Relation { Reaction = CombatReaction.Ally };
+safeAllyPack.Target.SetTo(packFaction.FormKey);
+safeFaction.Relations.Add(safeAllyPack);
+var packAllySafe = new Relation { Reaction = CombatReaction.Ally };
+packAllySafe.Target.SetTo(safeFaction.FormKey);
+packFaction.Relations.Add(packAllySafe);
+mod.Factions.Add(packFaction);
+
 questScript.Properties.Add(new ScriptObjectProperty
 {
     Name = "HostileFaction",
@@ -238,20 +255,37 @@ questScript.Properties.Add(new ScriptObjectProperty
     Flags = ScriptProperty.Flag.Edited,
     Object = new FormLink<ISkyrimMajorRecordGetter>(safeFaction.FormKey),
 });
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "PackFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(packFaction.FormKey),
+});
 
-// --- NPCs 0x801 / 0x802 ---
-// Both: EncBandit Nord — generic leveled bases so naked/body morph paths work
+// --- NPCs: one ActorBase per slot (outfit / Dress Up Lover's key off base) ---
+// Males 0x801 / 0x805 / 0x806; females 0x802 / 0x80D / 0x80E. Keep 0x801/0x802.
+// EncBandit Nord — generic leveled bases so naked/body morph paths work
 // (unique named clones like Alvor/Ysolda went solid black when undressed).
-// Female FaceGen from CharGen Female_Dummy; male keeps the default EncBandit head.
-var maleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale"));
-var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
-mod.Npcs.Add(maleNpc);
-mod.Npcs.Add(femaleNpc);
+// Female FaceGen from CharGen Female_Dummy (copied to all three); male EncBandit head.
+Npc[] maleNpcs = [
+    TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale0")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x805), "PTX_TrainingDummyMale1")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x806), "PTX_TrainingDummyMale2")),
+];
+Npc[] femaleNpcs = [
+    TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale0")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x80D), "PTX_TrainingDummyFemale1")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x80E), "PTX_TrainingDummyFemale2")),
+];
+foreach (var npc in maleNpcs)
+    mod.Npcs.Add(npc);
+foreach (var npc in femaleNpcs)
+    mod.Npcs.Add(npc);
 
 // Self-cast Script effects (Transmute pattern). TargetLocation+explosion never
 // fired Papyrus for us; cast-on-self is reliable for a personal tool.
 (MagicEffect mgef, Spell spell) MakeSummon(
-    FormKey mgefKey, FormKey spellKey, string genderLabel, Npc dummyBase)
+    FormKey mgefKey, FormKey spellKey, string genderLabel, bool isFemale)
 {
     var mgef = new MagicEffect(mgefKey, SkyrimRelease.SkyrimSE)
     {
@@ -285,11 +319,11 @@ mod.Npcs.Add(femaleNpc);
         Flags = ScriptProperty.Flag.Edited,
         Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
     });
-    script.Properties.Add(new ScriptObjectProperty
+    script.Properties.Add(new ScriptBoolProperty
     {
-        Name = "DummyBase",
+        Name = "IsFemale",
         Flags = ScriptProperty.Flag.Edited,
-        Object = new FormLink<ISkyrimMajorRecordGetter>(dummyBase.FormKey),
+        Data = isFemale,
     });
     adapter.Scripts.Add(script);
     mgef.VirtualMachineAdapter = adapter;
@@ -298,7 +332,7 @@ mod.Npcs.Add(femaleNpc);
     {
         EditorID = $"PTX_TrainingDummySummon{genderLabel}",
         Name = $"Summon {genderLabel} Training Dummy",
-        Description = $"Places an immortal {genderLabel.ToLowerInvariant()} training dummy in front of you. Replaces any existing dummy.",
+        Description = $"Places an immortal {genderLabel.ToLowerInvariant()} training dummy in front of you (up to 3; each has its own outfit base).",
         Type = SpellType.Spell,
         CastType = CastType.FireAndForget,
         TargetType = TargetType.Self,
@@ -317,8 +351,8 @@ mod.Npcs.Add(femaleNpc);
 }
 
 // Keep spell FormIDs stable from 0.2.x (0x808 / 0x80A / 0x80C).
-var (summonMaleMgef, summonMaleSpell) = MakeSummon(F(0x807), F(0x808), "Male", maleNpc);
-var (summonFemaleMgef, summonFemaleSpell) = MakeSummon(F(0x809), F(0x80A), "Female", femaleNpc);
+var (summonMaleMgef, summonMaleSpell) = MakeSummon(F(0x807), F(0x808), "Male", false);
+var (summonFemaleMgef, summonFemaleSpell) = MakeSummon(F(0x809), F(0x80A), "Female", true);
 mod.MagicEffects.Add(summonMaleMgef);
 mod.MagicEffects.Add(summonFemaleMgef);
 mod.Spells.Add(summonMaleSpell);
@@ -400,7 +434,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 mod.ModHeader.Author = "proteux";
-mod.ModHeader.Description = "Personal immortal training dummies (EncBandit Nord; female RaceMenu FaceGen).";
+mod.ModHeader.Description = "Personal immortal training dummies (one EncBandit Nord base per slot; female RaceMenu FaceGen).";
 mod.ModHeader.MasterReferences.Clear();
 mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
 mod.IsSmallMaster = true;

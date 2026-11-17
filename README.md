@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Optionally immortal (Essential + bleedout) or mortal (die + Resurrect), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Female uses a RaceMenu FaceGen head; male keeps the EncBandit default head (skin matches the body). Both keep the template outfit / keywords so SPID and outfit distributors can dress them. Up to three of each gender can be out at the same time.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Optionally immortal (Essential + bleedout) or mortal (die + Resurrect), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases — one ActorBase per slot (three of each gender) so outfit changers like Dress Up Lover’s can give each dummy its own gear that persists across dismiss/summon. Female uses a RaceMenu FaceGen head (same export copied to all three female FormIDs for now); male keeps the EncBandit default head. Bases keep the template outfit / keywords so SPID and outfit distributors can dress them.
 
 ## Requirements
 
@@ -47,12 +47,12 @@ SKSE plugin log:
 
 `Documents/My Games/Skyrim Special Edition/SKSE/TrainingDummyUI.log`
 
-The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Gear comes from the NPC `DefaultOutfit` plus whatever SPID / outfit distributors match; factions stay script-controlled so guards stay out. Ally/Friend ranks share the player's side for Cast an aura worn by you; Enemy/Archnemesis are for hex targets and same-side neighbour checks between dummies.
+The dummy keeps AI on but cannot walk (`SetDontMove`), so RaceMenu / MTF tattoo overlays can redraw. Gear comes from each slot’s NPC `DefaultOutfit` plus whatever SPID / outfit distributors match; factions stay script-controlled so guards stay out. Every dummy joins Safe + Pack factions that are Ally to each other, so `GetFactionReaction` between dummies is Ally (same-faction alone is only Neutral). Ally/Friend ranks toward you share your side for Cast an aura; Enemy/Archnemesis are for hex targets and pack neighbour checks.
 
 ## Faces
 
 Female: RaceMenu Sculpt → Export Head as `Female_Dummy` into `Data/SKSE/Plugins/CharGen/`.
-`make live` runs `tools/sync_facegen.py`, which copies into FaceGen FormID `00000802`.
+`make live` runs `tools/sync_facegen.py`, which copies that head to FaceGen FormIDs `00000802`, `0000080D`, and `0000080E` (all three female slots).
 
 Male: no FaceGen override — uses the EncBandit Nord default head.
 
