@@ -76,7 +76,8 @@ namespace tdui::game {
             }
             CallMethod(quest, kQuestScript, "ApplyUiSettings", {}, settings.matchPlayer,
                 static_cast<std::int32_t>(settings.level), settings.healthPerLevel, settings.healthStartPercent,
-                settings.muteNotifications, static_cast<std::int32_t>(settings.relationshipRank));
+                settings.immortal, settings.downSeconds, settings.muteNotifications,
+                static_cast<std::int32_t>(settings.relationshipRank));
         });
     }
 
@@ -115,7 +116,7 @@ namespace tdui::game {
                     CallMethod(quest, kQuestScript, fn, {});
                 },
                 settings.matchPlayer, static_cast<std::int32_t>(settings.level), settings.healthPerLevel,
-                settings.healthStartPercent, settings.muteNotifications,
+                settings.healthStartPercent, settings.immortal, settings.downSeconds, settings.muteNotifications,
                 static_cast<std::int32_t>(settings.relationshipRank), false);
         });
     }

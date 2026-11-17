@@ -225,6 +225,19 @@ namespace tdui::ui {
             settingsDirty = true;
         }
 
+        if (Checkbox("Immortal", &settings_.immortal)) {
+            settingsDirty = true;
+        }
+        TextDisabled(settings_.immortal ? "Essential: kneel on 0 HP, then recover."
+                                       : "Mortal: die on 0 HP, then Resurrect.");
+
+        SetNextItemWidth(180);
+        SliderFloat("Down time", &settings_.downSeconds, 0.0f, 60.0f, "%.0f s");
+        if (IsItemDeactivatedAfterEdit()) {
+            settingsDirty = true;
+        }
+        TextDisabled("Seconds down before full recovery (0 = until Heal now).");
+
         if (settings_.matchPlayer) {
             TextDisabled("Max HP = player level x %.0f; start at %.0f%%", settings_.healthPerLevel,
                 settings_.healthStartPercent);
@@ -265,6 +278,7 @@ namespace tdui::ui {
             settings_.level = std::clamp(settings_.level, 1, 1000);
             settings_.healthPerLevel = std::clamp(settings_.healthPerLevel, 1.0f, 10000.0f);
             settings_.healthStartPercent = std::clamp(settings_.healthStartPercent, 1.0f, 100.0f);
+            settings_.downSeconds = std::clamp(settings_.downSeconds, 0.0f, 300.0f);
             settings_.relationshipRank = std::clamp(settings_.relationshipRank, -4, 3);
             SaveSettings();
             PushSettingsToGame();

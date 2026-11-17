@@ -11,6 +11,10 @@ Function SetActorValue(String asValueName, Float afValue) native
 Function RestoreActorValue(String asValueName, Float afAmount) native
 Function DamageActorValue(String asValueName, Float afAmount) native
 Float Function GetActorValue(String asValueName) native
+Function SetNoBleedoutRecovery(Bool abAllowed) native
+Bool Function IsBleedingOut() native
+Bool Function IsDead() native
+Function Resurrect() native
 Int Function GetLevel() native
 Bool Function HasSpell(Form akForm) native
 Bool Function AddSpell(Spell akSpell, Bool abVerbose = True) native

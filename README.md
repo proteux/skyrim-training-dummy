@@ -1,6 +1,6 @@
 # Training Dummy
 
-Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Immortal (Essential + bleedout heal), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Female uses a RaceMenu FaceGen head; male keeps the EncBandit default head (skin matches the body). Both keep the template outfit / keywords so SPID and outfit distributors can dress them. Up to three of each gender can be out at the same time.
+Personal test dummy for Magic Tattoos (Hex damage, hit logging, tattoos). Optionally immortal (Essential + bleedout) or mortal (die + Resurrect), non-hostile, configurable level and health. Both male and female use EncBandit Nord bases. Female uses a RaceMenu FaceGen head; male keeps the EncBandit default head (skin matches the body). Both keep the template outfit / keywords so SPID and outfit distributors can dress them. Up to three of each gender can be out at the same time.
 
 ## Requirements
 
@@ -30,7 +30,9 @@ Open the Mod Control Panel (default hotkey from Menu Framework) → **Training D
 - Summon / dismiss / heal now (add or remove spells from the Mod Control Panel section)
 - **Match player level** (default on), or set a fixed level — under **Summon settings** in the standalone window
 - **Health per level** (default **50**): max HP = level × this
-- **Start at % HP** (default **100**): current HP on summon / when settings reapply; use a lower value to test healing auras. Out-of-combat HealRate (~0.7% max/s) is stripped from poll ticks so that value sticks; OnHit and Cast an aura / CastAs heals keep the rest. Use Ally/Friend rank for auras on the player (helpful or harmful — both hit the wearer's side; MTF Plugin - Skyrim 0.3.7+). **Heal now** and bleedout still fill to 100%
+- **Start at % HP** (default **100**): current HP on summon / when settings reapply; use a lower value to test healing auras. Out-of-combat HealRate (~0.7% max/s) is stripped from poll ticks so that value sticks; OnHit and Cast an aura / CastAs heals keep the rest. Use Ally/Friend rank for auras on the player (helpful or harmful — both hit the wearer's side; MTF Plugin - Skyrim 0.3.7+). **Heal now** still fills to 100%
+- **Immortal** (default on): Essential kneel + heal; off = die and Resurrect after the down timer
+- **Down time** (default **10** s): seconds down after bleedout / death before full recovery (0 = stay down until **Heal now**)
 - **vs player** relationship (default Lover): Ally/Friend dummies share your side, so a Flames or Healing aura on you hits them. Use **Enemy** or **Archnemesis** as hex targets (and park another Enemy nearby) to test a harmful hex aura burning the wearer's friends. Hitting or hexing a dummy does not report as assault, so town guards stay out of it; dummies stay Unaggressive. Cast an aura damage is logged even without a weapon/spell OnHit.
 - Rolling combat log with 5s / 10s DPS and HPS graphs (aura heals included), clear, and copy to clipboard
 - Hit notifications stay muted by default (hits still go to the log; change `muteNotifications` in settings.json if needed)

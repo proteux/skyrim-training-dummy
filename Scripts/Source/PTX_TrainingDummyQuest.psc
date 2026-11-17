@@ -28,6 +28,10 @@ Int Property DummyLevel = 1 Auto
 Float Property HealthPerLevel = 50.0 Auto
 ; Current HP as % of max on summon / settings reassert (1–100). Heal now fills to 100%.
 Float Property HealthStartPercent = 100.0 Auto
+; Essential + bleedout when True; die + Resurrect when False.
+Bool Property Immortal = True Auto
+; Real seconds down after bleedout / death before full recovery (0 = stay down until Heal now).
+Float Property DownSeconds = 10.0 Auto
 Bool Property MuteNotifications = True Auto
 ; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) / Archnemesis also join
 ; HostileFaction (enemy only to PlayerFaction) so IsHostileToActor(player) is true
@@ -104,7 +108,7 @@ EndFunction
 
 ; abReassert: True when the user changed settings (snap live dummies). False when
 ; only priming properties before a summon so damaged dummies are left alone.
-Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abMuteNotifications, Int aiRelationshipRank, Bool abReassert = True)
+Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abImmortal, Float afDownSeconds, Bool abMuteNotifications, Int aiRelationshipRank, Bool abReassert = True)
 	MatchPlayerLevel = abMatchPlayer
 	If aiLevel < 1
 		aiLevel = 1
@@ -120,6 +124,13 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 		afHealthStartPercent = 100.0
 	EndIf
 	HealthStartPercent = afHealthStartPercent
+	Immortal = abImmortal
+	If afDownSeconds < 0.0
+		afDownSeconds = 0.0
+	ElseIf afDownSeconds > 300.0
+		afDownSeconds = 300.0
+	EndIf
+	DownSeconds = afDownSeconds
 	MuteNotifications = abMuteNotifications
 	If aiRelationshipRank < -4
 		aiRelationshipRank = -4
@@ -129,6 +140,17 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 	RelationshipRank = aiRelationshipRank
 	If abReassert
 		ReassertLiveDummy()
+	EndIf
+EndFunction
+
+; Shared ActorBase Essential flag — all live copies of that base share it.
+Function ApplyImmortality(Actor dummy)
+	If !dummy
+		Return
+	EndIf
+	ActorBase base = dummy.GetActorBase()
+	If base
+		base.SetEssential(Immortal)
 	EndIf
 EndFunction
 
@@ -459,6 +481,16 @@ Function HealSlot(ReferenceAlias slot, Float afMaxHp)
 	If !dummy
 		Return
 	EndIf
+	; Alias path resurrects / ends bleedout wait, then fills HP.
+	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
+	If typed
+		typed.RecoverNow()
+		Return
+	EndIf
+	If dummy.IsDead()
+		dummy.Resurrect()
+	EndIf
+	ApplyImmortality(dummy)
 	ApplyHealth(dummy, afMaxHp, afMaxHp)
 	ResetAliasHealthTracking(slot)
 EndFunction
@@ -521,6 +553,10 @@ Function ConfigureDummy(Actor dummy)
 	Int level = EffectiveLevel()
 	Float maxHp = EffectiveMaxHealth()
 	Float startHp = EffectiveStartHealth()
+	ApplyImmortality(dummy)
+	If dummy.IsDead()
+		dummy.Resurrect()
+	EndIf
 	dummy.SetGhost(False)
 	dummy.StopCombat()
 	dummy.EnableAI(True)
