@@ -21,6 +21,9 @@ Bool MaleReserving2 = False
 Bool FemaleReserving0 = False
 Bool FemaleReserving1 = False
 Bool FemaleReserving2 = False
+; When all slots are filled, the next summon replaces this index (then advances).
+Int MaleNextReplace = 0
+Int FemaleNextReplace = 0
 
 ; UI / settings — health max = EffectiveLevel() * HealthPerLevel
 Bool Property MatchPlayerLevel = True Auto
@@ -28,14 +31,24 @@ Int Property DummyLevel = 1 Auto
 Float Property HealthPerLevel = 50.0 Auto
 ; Current HP as % of max on summon / settings reassert (1–100). Heal now fills to 100%.
 Float Property HealthStartPercent = 100.0 Auto
+; Essential + bleedout when True; die + Resurrect when False.
+Bool Property Immortal = True Auto
+; Real seconds down after bleedout / death before full recovery (0 = stay down until Heal now).
+Float Property DownSeconds = 10.0 Auto
 Bool Property MuteNotifications = True Auto
-; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) / Archnemesis also join
-; HostileFaction (enemy only to PlayerFaction) so IsHostileToActor(player) is true
-; for harmful Cast an aura effects without making town guards attack them. SafeFaction is
-; always applied so hitting / hexing a dummy does not report as town assault.
+; Toward the player: -4 Archnemesis … 3 Lover. Two separate packs:
+; Rival+ → HostileFaction + PackFaction (Ally to each other, Enemy to you and to Friend+).
+; Friend+ → FriendFaction + FriendPackFaction (Ally to each other and to you, Enemy to Rival+).
+; Acquaintance → SafeFaction only (crime-immune). Packs carry their own crime flags.
 Int Property RelationshipRank = 3 Auto
 Faction Property HostileFaction Auto
 Faction Property SafeFaction Auto
+; Hostile pack partner (Ally with HostileFaction). Rival+ only.
+Faction Property PackFaction Auto
+; Friend+ — Ally to PlayerFaction.
+Faction Property FriendFaction Auto
+; Friend pack partner (Ally with FriendFaction). Friend+ only.
+Faction Property FriendPackFaction Auto
 
 Event OnInit()
 	RegisterForSingleUpdate(2.0)
@@ -104,7 +117,7 @@ EndFunction
 
 ; abReassert: True when the user changed settings (snap live dummies). False when
 ; only priming properties before a summon so damaged dummies are left alone.
-Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abMuteNotifications, Int aiRelationshipRank, Bool abReassert = True)
+Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel, Float afHealthStartPercent, Bool abImmortal, Float afDownSeconds, Bool abMuteNotifications, Int aiRelationshipRank, Bool abReassert = True)
 	MatchPlayerLevel = abMatchPlayer
 	If aiLevel < 1
 		aiLevel = 1
@@ -120,6 +133,13 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 		afHealthStartPercent = 100.0
 	EndIf
 	HealthStartPercent = afHealthStartPercent
+	Immortal = abImmortal
+	If afDownSeconds < 0.0
+		afDownSeconds = 0.0
+	ElseIf afDownSeconds > 300.0
+		afDownSeconds = 300.0
+	EndIf
+	DownSeconds = afDownSeconds
 	MuteNotifications = abMuteNotifications
 	If aiRelationshipRank < -4
 		aiRelationshipRank = -4
@@ -129,6 +149,17 @@ Function ApplyUiSettings(Bool abMatchPlayer, Int aiLevel, Float afHealthPerLevel
 	RelationshipRank = aiRelationshipRank
 	If abReassert
 		ReassertLiveDummy()
+	EndIf
+EndFunction
+
+; Essential is per ActorBase — each slot has its own base.
+Function ApplyImmortality(Actor dummy)
+	If !dummy
+		Return
+	EndIf
+	ActorBase base = dummy.GetActorBase()
+	If base
+		base.SetEssential(Immortal)
 	EndIf
 EndFunction
 
@@ -188,7 +219,7 @@ Bool Function PlayerHasSpells()
 	Return player.HasSpell(SummonMaleSpell)
 EndFunction
 
-; Slot 0/1/2 → distinct spellings (shared ActorBase can't hold three FULL names).
+; Slot 0/1/2 → distinct spellings (also set on each base's FULL as fallback).
 String Function NameForSlot(Bool abFemale, Int aiIndex)
 	If abFemale
 		If aiIndex == 0
@@ -206,60 +237,91 @@ String Function NameForSlot(Bool abFemale, Int aiIndex)
 	Return "Shaun"
 EndFunction
 
+; Males 0x801/0x805/0x806; females 0x802/0x80D/0x80E — one base per slot.
+ActorBase Function BaseForSlot(Bool abFemale, Int aiIndex)
+	Int formId = 0
+	If abFemale
+		If aiIndex == 0
+			formId = 0x802
+		ElseIf aiIndex == 1
+			formId = 0x80D
+		ElseIf aiIndex == 2
+			formId = 0x80E
+		EndIf
+	Else
+		If aiIndex == 0
+			formId = 0x801
+		ElseIf aiIndex == 1
+			formId = 0x805
+		ElseIf aiIndex == 2
+			formId = 0x806
+		EndIf
+	EndIf
+	If formId == 0
+		Return None
+	EndIf
+	Return Game.GetFormFromFile(formId, "PTX_TrainingDummy.esp") as ActorBase
+EndFunction
+
 Function SummonMale()
-	ActorBase base = Game.GetFormFromFile(0x801, "PTX_TrainingDummy.esp") as ActorBase
 	Actor player = Game.GetPlayer()
-	If player && base
-		SpawnInFrontOf(player, base)
+	If player
+		SpawnInFrontOf(player, False)
 	EndIf
 EndFunction
 
 Function SummonFemale()
-	ActorBase base = Game.GetFormFromFile(0x802, "PTX_TrainingDummy.esp") as ActorBase
 	Actor player = Game.GetPlayer()
-	If player && base
-		SpawnInFrontOf(player, base)
+	If player
+		SpawnInFrontOf(player, True)
 	EndIf
 EndFunction
 
-Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
-	If !akCaster || !akBase
+Function SpawnInFrontOf(Actor akCaster, Bool abFemale)
+	If !akCaster
 		Return
 	EndIf
 
-	Bool female = akBase.GetSex() == 1
-	Int slotIndex = FindFreeSlot(female)
+	; Empty slot first; if full (alive or dead), clear and reuse the next replace slot.
+	Int slotIndex = ClaimSummonSlot(abFemale)
 	If slotIndex < 0
-		Notify("Training Dummy: already have " + MaxPerGender + " of that type.")
+		Notify("Training Dummy: no free slot (busy).")
 		Return
 	EndIf
 
-	ReferenceAlias slot = SlotAt(female, slotIndex)
+	ActorBase akBase = BaseForSlot(abFemale, slotIndex)
+	If !akBase
+		SetSlotReserved(abFemale, slotIndex, False)
+		Notify("Training Dummy: missing ActorBase for slot.")
+		Return
+	EndIf
+
+	ReferenceAlias slot = SlotAt(abFemale, slotIndex)
 	If !slot
-		SetSlotReserved(female, slotIndex, False)
+		SetSlotReserved(abFemale, slotIndex, False)
 		Notify("Training Dummy: no alias for that slot.")
 		Return
 	EndIf
 
 	Actor dummy = akCaster.PlaceActorAtMe(akBase)
 	If !dummy
-		SetSlotReserved(female, slotIndex, False)
+		SetSlotReserved(abFemale, slotIndex, False)
 		Notify("Training Dummy: PlaceActorAtMe failed.")
 		Return
 	EndIf
 
-	; Shared bases / reused FormIDs can keep leftover MTF overlays — scrub before use.
+	; Reused FormIDs can keep leftover MTF overlays — scrub before use.
 	ClearMagicTattoos(dummy)
 
 	; Claim the alias before MoveTo / Configure so a parallel summon cannot reuse it,
 	; and so pin/heal tracking attaches even if later steps hitch.
 	slot.ForceRefTo(dummy)
-	SetSlotReserved(female, slotIndex, False)
+	SetSlotReserved(abFemale, slotIndex, False)
 
 	; Fan left (male) / right (female); later slots step farther out and slightly forward.
 	Float az = akCaster.GetAngleZ()
 	Float sideSign = 1.0
-	If !female
+	If !abFemale
 		sideSign = -1.0
 	EndIf
 	Float side = sideSign * SideOffset * (1.0 + (slotIndex as Float) * 2.0)
@@ -269,7 +331,7 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	dummy.MoveTo(akCaster, x, y, 0.0, True)
 	dummy.SetAngle(0.0, 0.0, az + 180.0)
 
-	TrainingDummyUI.SetDisplayName(dummy, NameForSlot(female, slotIndex))
+	TrainingDummyUI.SetDisplayName(dummy, NameForSlot(abFemale, slotIndex))
 	ConfigureDummy(dummy)
 	ResetAliasHealthTracking(slot)
 	StartAliasPinWatch(slot, dummy)
@@ -313,7 +375,7 @@ Function ClearAlias(ReferenceAlias slot)
 EndFunction
 
 ; Soft dep on Magic Tattoos Framework — drop presets, overlays, and tracking so the
-; next PlaceActorAtMe of the shared base is blank.
+; next PlaceActorAtMe of that slot's base is blank.
 Function ClearMagicTattoos(Actor akDummy)
 	If !akDummy
 		Return
@@ -398,6 +460,89 @@ Int Function FindFreeSlot(Bool abFemale)
 	Return -1
 EndFunction
 
+Int Function NextReplaceIndex(Bool abFemale)
+	If abFemale
+		Return FemaleNextReplace
+	EndIf
+	Return MaleNextReplace
+EndFunction
+
+Function SetNextReplaceIndex(Bool abFemale, Int aiIndex)
+	If aiIndex < 0
+		aiIndex = 0
+	ElseIf aiIndex >= MaxPerGender
+		aiIndex = 0
+	EndIf
+	If abFemale
+		FemaleNextReplace = aiIndex
+	Else
+		MaleNextReplace = aiIndex
+	EndIf
+EndFunction
+
+; Prefer an empty alias; otherwise replace the next filled slot (dead preferred, then round-robin).
+Int Function ClaimSummonSlot(Bool abFemale)
+	Int free = FindFreeSlot(abFemale)
+	If free >= 0
+		Return free
+	EndIf
+
+	Int start = NextReplaceIndex(abFemale)
+	If start < 0 || start >= MaxPerGender
+		start = 0
+	EndIf
+
+	; From the replace cursor, prefer a dead occupant so corpses get recycled first.
+	Int deadIndex = -1
+	Int i = 0
+	While i < MaxPerGender
+		Int cand = start + i
+		If cand >= MaxPerGender
+			cand -= MaxPerGender
+		EndIf
+		If !IsSlotReserved(abFemale, cand)
+			ReferenceAlias slot = SlotAt(abFemale, cand)
+			Actor existing = None
+			If slot
+				existing = slot.GetActorReference()
+			EndIf
+			If existing && existing.IsDead()
+				deadIndex = cand
+				i = MaxPerGender
+			EndIf
+		EndIf
+		i += 1
+	EndWhile
+
+	Int index = deadIndex
+	If index < 0
+		; No dead slot — take the first non-reserved from the cursor.
+		i = 0
+		While i < MaxPerGender && index < 0
+			Int cand = start + i
+			If cand >= MaxPerGender
+				cand -= MaxPerGender
+			EndIf
+			If !IsSlotReserved(abFemale, cand)
+				index = cand
+			EndIf
+			i += 1
+		EndWhile
+	EndIf
+	If index < 0
+		Return -1
+	EndIf
+
+	ClearAlias(SlotAt(abFemale, index))
+	SetSlotReserved(abFemale, index, True)
+	Int nextIndex = index + 1
+	If nextIndex >= MaxPerGender
+		nextIndex = 0
+	EndIf
+	SetNextReplaceIndex(abFemale, nextIndex)
+	Return index
+EndFunction
+
 ; Settings / cell return: reassert every filled slot.
 Function ReassertLiveDummy()
 	Int i = 0
@@ -459,6 +604,16 @@ Function HealSlot(ReferenceAlias slot, Float afMaxHp)
 	If !dummy
 		Return
 	EndIf
+	; Alias path resurrects / ends bleedout wait, then fills HP.
+	PTX_TrainingDummyAlias typed = slot as PTX_TrainingDummyAlias
+	If typed
+		typed.RecoverNow()
+		Return
+	EndIf
+	If dummy.IsDead()
+		dummy.Resurrect()
+	EndIf
+	ApplyImmortality(dummy)
 	ApplyHealth(dummy, afMaxHp, afMaxHp)
 	ResetAliasHealthTracking(slot)
 EndFunction
@@ -497,9 +652,36 @@ Faction Function ResolveSafeFaction()
 	If SafeFaction
 		Return SafeFaction
 	EndIf
-	; PTX_TrainingDummyFaction (0x804) — crime-immune at every rank.
+	; PTX_TrainingDummyFaction (0x804) — Acquaintance only (crime-immune, no pack links).
 	SafeFaction = Game.GetFormFromFile(0x804, "PTX_TrainingDummy.esp") as Faction
 	Return SafeFaction
+EndFunction
+
+Faction Function ResolvePackFaction()
+	If PackFaction
+		Return PackFaction
+	EndIf
+	; PTX_TrainingDummyPackFaction (0x80F) — Ally with HostileFaction; Rival+ pack.
+	PackFaction = Game.GetFormFromFile(0x80F, "PTX_TrainingDummy.esp") as Faction
+	Return PackFaction
+EndFunction
+
+Faction Function ResolveFriendFaction()
+	If FriendFaction
+		Return FriendFaction
+	EndIf
+	; PTX_TrainingDummyFriendFaction (0x810) — Ally to PlayerFaction for Friend+ ranks.
+	FriendFaction = Game.GetFormFromFile(0x810, "PTX_TrainingDummy.esp") as Faction
+	Return FriendFaction
+EndFunction
+
+Faction Function ResolveFriendPackFaction()
+	If FriendPackFaction
+		Return FriendPackFaction
+	EndIf
+	; PTX_TrainingDummyFriendPackFaction (0x811) — Ally with FriendFaction; Friend+ pack.
+	FriendPackFaction = Game.GetFormFromFile(0x811, "PTX_TrainingDummy.esp") as Faction
+	Return FriendPackFaction
 EndFunction
 
 Function SetFactionMembership(Actor dummy, Faction akFaction, Bool wantIn)
@@ -521,6 +703,10 @@ Function ConfigureDummy(Actor dummy)
 	Int level = EffectiveLevel()
 	Float maxHp = EffectiveMaxHealth()
 	Float startHp = EffectiveStartHealth()
+	ApplyImmortality(dummy)
+	If dummy.IsDead()
+		dummy.Resurrect()
+	EndIf
 	dummy.SetGhost(False)
 	dummy.StopCombat()
 	dummy.EnableAI(True)
@@ -545,10 +731,38 @@ Function ConfigureDummy(Actor dummy)
 	If bandit && dummy.IsInFaction(bandit)
 		dummy.RemoveFromFaction(bandit)
 	EndIf
-	; Always crime-immune. Enemy / Archnemesis also get the player-hostile faction
-	; so harmful Cast an aura effects pass IsHostileToActor without involving guards.
-	SetFactionMembership(dummy, ResolveSafeFaction(), True)
-	SetFactionMembership(dummy, ResolveHostileFaction(), rank <= -3)
+	; Rival+: hostile pack (Hostile + Pack). Friend+: friend pack (Friend + FriendPack).
+	; Acquaintance: Safe only. Packs are Enemy across ranks (ESP relations) so a
+	; Cast an aura hex on Rival+ does not treat Friend+ as same-side Neutrals.
+	; SafeFaction stays off the packs so shared-faction Neutral cannot soften that.
+	Bool hostile = rank <= -2
+	Bool friendly = rank >= 0
+	SetFactionMembership(dummy, ResolveSafeFaction(), !hostile && !friendly)
+	SetFactionMembership(dummy, ResolveHostileFaction(), hostile)
+	SetFactionMembership(dummy, ResolvePackFaction(), hostile)
+	SetFactionMembership(dummy, ResolveFriendFaction(), friendly)
+	SetFactionMembership(dummy, ResolveFriendPackFaction(), friendly)
+EndFunction
+
+; Log / UI tag for a filled alias: M1..M3 / F1..F3 (matches the status grid).
+String Function SlotTagForAlias(ReferenceAlias slot)
+	If !slot
+		Return "?"
+	EndIf
+	If slot == MaleAlias0
+		Return "M1"
+	ElseIf slot == MaleAlias1
+		Return "M2"
+	ElseIf slot == MaleAlias2
+		Return "M3"
+	ElseIf slot == FemaleAlias0
+		Return "F1"
+	ElseIf slot == FemaleAlias1
+		Return "F2"
+	ElseIf slot == FemaleAlias2
+		Return "F3"
+	EndIf
+	Return "?"
 EndFunction
 
 Function Notify(String asText)

@@ -20,7 +20,7 @@ Install with your mod manager and enable [font=Courier New]PTX_TrainingDummy.esp
 [size=5][b]Spells[/b][/size]
 
 [list]
-[*][b]Summon Male / Female Training Dummy[/b] — places another dummy in front of you (up to 3 per gender; refuses when full)[/*]
+[*][b]Summon Male / Female Training Dummy[/b] — places another dummy in front of you (up to 3 per gender; when full, replaces the next slot, preferring dead ones)[/*]
 [*][b]Dismiss Training Dummy[/b] — removes all live dummies[/*]
 [/list]
 
@@ -31,6 +31,8 @@ By using SKSE UI you can leave the DPS window open while casting spells and atta
 [*][b]Match player level[/b] (default on), or a fixed level[/*]
 [*][b]Health per level[/b] (default 50): max HP = level × this[/*]
 [*][b]Start at % HP[/b] (default 100): useful for testing healing[/*]
+[*][b]Immortal[/b] (default on): Essential kneel, or uncheck to die + Resurrect[/*]
+[*][b]Down time[/b] (default 10 s; 0 = until Heal now): stay down before full recovery[/*]
 [*][b]vs player[/b] relationship (default Lover): set from [b]Archnemesis[/b] to Lover[/*]
 [*]Rolling combat log with 5s / 10s DPS and HPS graphs, clear, and copy to clipboard[/*]
 [/list]

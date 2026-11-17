@@ -89,11 +89,16 @@ namespace tdui::io {
         GetNumber(*j, "level", level);
         GetNumber(*j, "healthPerLevel", healthPerLevel);
         GetNumber(*j, "healthStartPercent", healthStartPercent);
+        GetBool(*j, "immortal", immortal);
+        // Old key first; downSeconds overrides when present.
+        GetNumber(*j, "bleedoutDownSeconds", downSeconds);
+        GetNumber(*j, "downSeconds", downSeconds);
         GetBool(*j, "muteNotifications", muteNotifications);
         GetNumber(*j, "relationshipRank", relationshipRank);
         level = std::clamp(level, 1, 1000);
         healthPerLevel = std::clamp(healthPerLevel, 1.0f, 10000.0f);
         healthStartPercent = std::clamp(healthStartPercent, 1.0f, 100.0f);
+        downSeconds = std::clamp(downSeconds, 0.0f, 300.0f);
         relationshipRank = std::clamp(relationshipRank, -4, 3);
     }
 
@@ -104,6 +109,8 @@ namespace tdui::io {
         j["level"] = level;
         j["healthPerLevel"] = healthPerLevel;
         j["healthStartPercent"] = healthStartPercent;
+        j["immortal"] = immortal;
+        j["downSeconds"] = downSeconds;
         j["muteNotifications"] = muteNotifications;
         j["relationshipRank"] = relationshipRank;
         return WriteTextAtomic(path, j.dump(2, ' ', false, nlohmann::json::error_handler_t::replace));

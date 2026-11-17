@@ -225,6 +225,19 @@ namespace tdui::ui {
             settingsDirty = true;
         }
 
+        if (Checkbox("Immortal", &settings_.immortal)) {
+            settingsDirty = true;
+        }
+        TextDisabled(settings_.immortal ? "Essential: kneel on 0 HP, then recover."
+                                       : "Mortal: die on 0 HP, then Resurrect.");
+
+        SetNextItemWidth(180);
+        SliderFloat("Down time", &settings_.downSeconds, 0.0f, 60.0f, "%.0f s");
+        if (IsItemDeactivatedAfterEdit()) {
+            settingsDirty = true;
+        }
+        TextDisabled("Seconds down before full recovery (0 = until Heal now).");
+
         if (settings_.matchPlayer) {
             TextDisabled("Max HP = player level x %.0f; start at %.0f%%", settings_.healthPerLevel,
                 settings_.healthStartPercent);
@@ -234,18 +247,19 @@ namespace tdui::ui {
         }
 
         // Ranks match Actor.SetRelationshipRank / the Creation Kit.
+        // Faction tag: Rival+ = Enemy pack, Acquaintance = Neutral, Friend+ = Ally pack.
         static constexpr const char* kRankLabels[] = {
-            "Archnemesis (-4)",
-            "Enemy (-3)",
-            "Rival (-2)",
-            "Acquaintance (-1)",
-            "Friend (0)",
-            "Confidant (1)",
-            "Ally (2)",
-            "Lover (3)",
+            "Archnemesis (-4) - Enemy Faction",
+            "Enemy (-3) - Enemy Faction",
+            "Rival (-2) - Enemy Faction",
+            "Acquaintance (-1) - Neutral Faction",
+            "Friend (0) - Ally Faction",
+            "Confidant (1) - Ally Faction",
+            "Ally (2) - Ally Faction",
+            "Lover (3) - Ally Faction",
         };
         const int rankIndex = std::clamp(settings_.relationshipRank + 4, 0, 7);
-        SetNextItemWidth(220);
+        SetNextItemWidth(320);
         if (BeginCombo("vs player", kRankLabels[rankIndex])) {
             for (int i = 0; i < 8; ++i) {
                 const bool selected = i == rankIndex;
@@ -259,12 +273,13 @@ namespace tdui::ui {
             }
             EndCombo();
         }
-        TextDisabled("Ally/Friend: same side as player for Cast an aura on you; Enemy: hex-aura neighbour tests.");
+        TextDisabled("Enemy pack: Ally to each other, Enemy to you and to Ally pack. Ally pack: Ally to each other and to you.");
 
         if (settingsDirty) {
             settings_.level = std::clamp(settings_.level, 1, 1000);
             settings_.healthPerLevel = std::clamp(settings_.healthPerLevel, 1.0f, 10000.0f);
             settings_.healthStartPercent = std::clamp(settings_.healthStartPercent, 1.0f, 100.0f);
+            settings_.downSeconds = std::clamp(settings_.downSeconds, 0.0f, 300.0f);
             settings_.relationshipRank = std::clamp(settings_.relationshipRank, -4, 3);
             SaveSettings();
             PushSettingsToGame();

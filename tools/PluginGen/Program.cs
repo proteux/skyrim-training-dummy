@@ -56,10 +56,10 @@ Npc MakeDummy(string templateEditorId, FormKey formKey, string editorId)
         | NpcConfiguration.Flag.Invulnerable
         | NpcConfiguration.Flag.IsGhost
         | NpcConfiguration.Flag.Summonable);
-    // Not Unique — up to three live instances share each base (0x801 / 0x802).
+    // One live instance per base (slot). Not Unique — PlaceActorAtMe + Delete.
     npc.Configuration.Flags |= NpcConfiguration.Flag.Essential
         | NpcConfiguration.Flag.DoesntAffectStealthMeter;
-    // EncBandit templates are lv1 — keep both bases equal before runtime level.
+    // EncBandit templates are lv1 — keep all bases equal before runtime level.
     // Runtime TrainingDummyUI.SetActorLevel overwrites this to the UI level.
     npc.Configuration.Level = new NpcLevel { Level = 1 };
     npc.Configuration.CalcMinLevel = 0;
@@ -217,7 +217,9 @@ playerEnemy.Target.SetTo(new FormKey(skyrim, 0xDB1)); // PlayerFaction
 hostileFaction.Relations.Add(playerEnemy);
 mod.Factions.Add(hostileFaction);
 
-// 0x804: every dummy, every rank — crime-immune even when not "Enemy".
+// 0x804: Acquaintance only — crime-immune with no Ally/Enemy links. Pack ranks use their
+// own factions' crime flags instead, so a shared Safe membership cannot Neutralize the
+// Rival+ ↔ Friend+ Enemy relations below.
 var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
 {
     EditorID = "PTX_TrainingDummyFaction",
@@ -225,6 +227,68 @@ var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
     Flags = dummyCrimeFlags,
 };
 mod.Factions.Add(safeFaction);
+
+// 0x80F: hostile pack partner. Rival+ join HostileFaction + PackFaction; Ally both ways so
+// GetFactionReaction between hostiles is Ally. Not linked to Safe or Friend factions.
+var packFaction = new Faction(F(0x80F), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyPackFaction",
+    Name = "Training Dummy Hostile Pack",
+    Flags = dummyCrimeFlags,
+};
+var hostileAllyPack = new Relation { Reaction = CombatReaction.Ally };
+hostileAllyPack.Target.SetTo(packFaction.FormKey);
+hostileFaction.Relations.Add(hostileAllyPack);
+var packAllyHostile = new Relation { Reaction = CombatReaction.Ally };
+packAllyHostile.Target.SetTo(hostileFaction.FormKey);
+packFaction.Relations.Add(packAllyHostile);
+mod.Factions.Add(packFaction);
+
+// 0x810: Friend+ — Ally to PlayerFaction. 0x811 FriendPack — Ally with FriendFaction so
+// Friend+ dummies are Ally to each other without sharing the hostile pack.
+var friendFaction = new Faction(F(0x810), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyFriendFaction",
+    Name = "Training Dummy Friend",
+    Flags = dummyCrimeFlags,
+};
+var friendAllyPlayer = new Relation { Reaction = CombatReaction.Ally };
+friendAllyPlayer.Target.SetTo(new FormKey(skyrim, 0xDB1)); // PlayerFaction
+friendFaction.Relations.Add(friendAllyPlayer);
+mod.Factions.Add(friendFaction);
+
+var friendPackFaction = new Faction(F(0x811), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyFriendPackFaction",
+    Name = "Training Dummy Friend Pack",
+    Flags = dummyCrimeFlags,
+};
+var friendAllyPack = new Relation { Reaction = CombatReaction.Ally };
+friendAllyPack.Target.SetTo(friendPackFaction.FormKey);
+friendFaction.Relations.Add(friendAllyPack);
+var packAllyFriend = new Relation { Reaction = CombatReaction.Ally };
+packAllyFriend.Target.SetTo(friendFaction.FormKey);
+friendPackFaction.Relations.Add(packAllyFriend);
+mod.Factions.Add(friendPackFaction);
+
+// Cross-pack Enemy both ways. Cast an aura hits anyone who isn't an enemy of the
+// wearer (Neutral counts as same-side), so without this a Rival+ hex aura also
+// burns Friend+ dummies. SafeFaction is Acquaintance-only so shared-faction
+// Neutral cannot soften these links.
+void LinkEnemy(Faction from, Faction to)
+{
+    var rel = new Relation { Reaction = CombatReaction.Enemy };
+    rel.Target.SetTo(to.FormKey);
+    from.Relations.Add(rel);
+}
+LinkEnemy(hostileFaction, friendFaction);
+LinkEnemy(friendFaction, hostileFaction);
+LinkEnemy(hostileFaction, friendPackFaction);
+LinkEnemy(friendPackFaction, hostileFaction);
+LinkEnemy(packFaction, friendFaction);
+LinkEnemy(friendFaction, packFaction);
+LinkEnemy(packFaction, friendPackFaction);
+LinkEnemy(friendPackFaction, packFaction);
 
 questScript.Properties.Add(new ScriptObjectProperty
 {
@@ -238,20 +302,49 @@ questScript.Properties.Add(new ScriptObjectProperty
     Flags = ScriptProperty.Flag.Edited,
     Object = new FormLink<ISkyrimMajorRecordGetter>(safeFaction.FormKey),
 });
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "PackFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(packFaction.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "FriendFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(friendFaction.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "FriendPackFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(friendPackFaction.FormKey),
+});
 
-// --- NPCs 0x801 / 0x802 ---
-// Both: EncBandit Nord — generic leveled bases so naked/body morph paths work
+// --- NPCs: one ActorBase per slot (outfit / Dress Up Lover's key off base) ---
+// Males 0x801 / 0x805 / 0x806; females 0x802 / 0x80D / 0x80E. Keep 0x801/0x802.
+// EncBandit Nord — generic leveled bases so naked/body morph paths work
 // (unique named clones like Alvor/Ysolda went solid black when undressed).
-// Female FaceGen from CharGen Female_Dummy; male keeps the default EncBandit head.
-var maleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale"));
-var femaleNpc = TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale"));
-mod.Npcs.Add(maleNpc);
-mod.Npcs.Add(femaleNpc);
+// Female FaceGen from CharGen Female_Dummy (copied to all three); male EncBandit head.
+Npc[] maleNpcs = [
+    TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x801), "PTX_TrainingDummyMale0")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x805), "PTX_TrainingDummyMale1")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordM", F(0x806), "PTX_TrainingDummyMale2")),
+];
+Npc[] femaleNpcs = [
+    TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x802), "PTX_TrainingDummyFemale0")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x80D), "PTX_TrainingDummyFemale1")),
+    TuneAi(MakeDummy("EncBandit01Melee1HNordF", F(0x80E), "PTX_TrainingDummyFemale2")),
+];
+foreach (var npc in maleNpcs)
+    mod.Npcs.Add(npc);
+foreach (var npc in femaleNpcs)
+    mod.Npcs.Add(npc);
 
 // Self-cast Script effects (Transmute pattern). TargetLocation+explosion never
 // fired Papyrus for us; cast-on-self is reliable for a personal tool.
 (MagicEffect mgef, Spell spell) MakeSummon(
-    FormKey mgefKey, FormKey spellKey, string genderLabel, Npc dummyBase)
+    FormKey mgefKey, FormKey spellKey, string genderLabel, bool isFemale)
 {
     var mgef = new MagicEffect(mgefKey, SkyrimRelease.SkyrimSE)
     {
@@ -285,11 +378,11 @@ mod.Npcs.Add(femaleNpc);
         Flags = ScriptProperty.Flag.Edited,
         Object = new FormLink<ISkyrimMajorRecordGetter>(quest.FormKey),
     });
-    script.Properties.Add(new ScriptObjectProperty
+    script.Properties.Add(new ScriptBoolProperty
     {
-        Name = "DummyBase",
+        Name = "IsFemale",
         Flags = ScriptProperty.Flag.Edited,
-        Object = new FormLink<ISkyrimMajorRecordGetter>(dummyBase.FormKey),
+        Data = isFemale,
     });
     adapter.Scripts.Add(script);
     mgef.VirtualMachineAdapter = adapter;
@@ -298,7 +391,7 @@ mod.Npcs.Add(femaleNpc);
     {
         EditorID = $"PTX_TrainingDummySummon{genderLabel}",
         Name = $"Summon {genderLabel} Training Dummy",
-        Description = $"Places an immortal {genderLabel.ToLowerInvariant()} training dummy in front of you. Replaces any existing dummy.",
+        Description = $"Places an immortal {genderLabel.ToLowerInvariant()} training dummy in front of you (up to 3; each has its own outfit base).",
         Type = SpellType.Spell,
         CastType = CastType.FireAndForget,
         TargetType = TargetType.Self,
@@ -317,8 +410,8 @@ mod.Npcs.Add(femaleNpc);
 }
 
 // Keep spell FormIDs stable from 0.2.x (0x808 / 0x80A / 0x80C).
-var (summonMaleMgef, summonMaleSpell) = MakeSummon(F(0x807), F(0x808), "Male", maleNpc);
-var (summonFemaleMgef, summonFemaleSpell) = MakeSummon(F(0x809), F(0x80A), "Female", femaleNpc);
+var (summonMaleMgef, summonMaleSpell) = MakeSummon(F(0x807), F(0x808), "Male", false);
+var (summonFemaleMgef, summonFemaleSpell) = MakeSummon(F(0x809), F(0x80A), "Female", true);
 mod.MagicEffects.Add(summonMaleMgef);
 mod.MagicEffects.Add(summonFemaleMgef);
 mod.Spells.Add(summonMaleSpell);
@@ -400,7 +493,7 @@ questScript.Properties.Add(new ScriptObjectProperty
 });
 
 mod.ModHeader.Author = "proteux";
-mod.ModHeader.Description = "Personal immortal training dummies (EncBandit Nord; female RaceMenu FaceGen).";
+mod.ModHeader.Description = "Personal immortal training dummies (one EncBandit Nord base per slot; female RaceMenu FaceGen).";
 mod.ModHeader.MasterReferences.Clear();
 mod.ModHeader.MasterReferences.Add(new MasterReference { Master = skyrim });
 mod.IsSmallMaster = true;
