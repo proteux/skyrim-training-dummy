@@ -20,7 +20,7 @@ Needs `VCPKG_ROOT` set (same toolchain as Magic Tattoos UI). Enable `PTX_Trainin
 
 ### Spells
 
-- **Summon Male / Female Training Dummy** — places another dummy in front of you (up to 3 per gender; refuses when full).
+- **Summon Male / Female Training Dummy** — places another dummy in front of you (up to 3 per gender; when full, replaces the next slot, preferring dead ones).
 - **Dismiss Training Dummy** — removes all live dummies.
 
 ### SKSE UI

@@ -21,6 +21,9 @@ Bool MaleReserving2 = False
 Bool FemaleReserving0 = False
 Bool FemaleReserving1 = False
 Bool FemaleReserving2 = False
+; When all slots are filled, the next summon replaces this index (then advances).
+Int MaleNextReplace = 0
+Int FemaleNextReplace = 0
 
 ; UI / settings — health max = EffectiveLevel() * HealthPerLevel
 Bool Property MatchPlayerLevel = True Auto
@@ -250,9 +253,10 @@ Function SpawnInFrontOf(Actor akCaster, ActorBase akBase)
 	EndIf
 
 	Bool female = akBase.GetSex() == 1
-	Int slotIndex = FindFreeSlot(female)
+	; Empty slot first; if full (alive or dead), clear and reuse the next replace slot.
+	Int slotIndex = ClaimSummonSlot(female)
 	If slotIndex < 0
-		Notify("Training Dummy: already have " + MaxPerGender + " of that type.")
+		Notify("Training Dummy: no free slot (busy).")
 		Return
 	EndIf
 
@@ -418,6 +422,89 @@ Int Function FindFreeSlot(Bool abFemale)
 		i += 1
 	EndWhile
 	Return -1
+EndFunction
+
+Int Function NextReplaceIndex(Bool abFemale)
+	If abFemale
+		Return FemaleNextReplace
+	EndIf
+	Return MaleNextReplace
+EndFunction
+
+Function SetNextReplaceIndex(Bool abFemale, Int aiIndex)
+	If aiIndex < 0
+		aiIndex = 0
+	ElseIf aiIndex >= MaxPerGender
+		aiIndex = 0
+	EndIf
+	If abFemale
+		FemaleNextReplace = aiIndex
+	Else
+		MaleNextReplace = aiIndex
+	EndIf
+EndFunction
+
+; Prefer an empty alias; otherwise replace the next filled slot (dead preferred, then round-robin).
+Int Function ClaimSummonSlot(Bool abFemale)
+	Int free = FindFreeSlot(abFemale)
+	If free >= 0
+		Return free
+	EndIf
+
+	Int start = NextReplaceIndex(abFemale)
+	If start < 0 || start >= MaxPerGender
+		start = 0
+	EndIf
+
+	; From the replace cursor, prefer a dead occupant so corpses get recycled first.
+	Int deadIndex = -1
+	Int i = 0
+	While i < MaxPerGender
+		Int cand = start + i
+		If cand >= MaxPerGender
+			cand -= MaxPerGender
+		EndIf
+		If !IsSlotReserved(abFemale, cand)
+			ReferenceAlias slot = SlotAt(abFemale, cand)
+			Actor existing = None
+			If slot
+				existing = slot.GetActorReference()
+			EndIf
+			If existing && existing.IsDead()
+				deadIndex = cand
+				i = MaxPerGender
+			EndIf
+		EndIf
+		i += 1
+	EndWhile
+
+	Int index = deadIndex
+	If index < 0
+		; No dead slot — take the first non-reserved from the cursor.
+		i = 0
+		While i < MaxPerGender && index < 0
+			Int cand = start + i
+			If cand >= MaxPerGender
+				cand -= MaxPerGender
+			EndIf
+			If !IsSlotReserved(abFemale, cand)
+				index = cand
+			EndIf
+			i += 1
+		EndWhile
+	EndIf
+	If index < 0
+		Return -1
+	EndIf
+
+	ClearAlias(SlotAt(abFemale, index))
+	SetSlotReserved(abFemale, index, True)
+	Int nextIndex = index + 1
+	If nextIndex >= MaxPerGender
+		nextIndex = 0
+	EndIf
+	SetNextReplaceIndex(abFemale, nextIndex)
+	Return index
 EndFunction
 
 ; Settings / cell return: reassert every filled slot.
