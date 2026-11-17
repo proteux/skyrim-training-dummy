@@ -152,7 +152,7 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 
 	If delta > 0.5
 		Int dmgInt = delta as Int
-		String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=" + who
+		String line = "hit target=" + SlotTag() + " dmg=" + dmgInt + " source=" + sourceName + " aggressor=" + who
 		If abHitBlocked
 			line += " blocked=1"
 		EndIf
@@ -167,7 +167,7 @@ Event OnHit(ObjectReference akAggressor, Form akSource, Projectile akProjectile,
 	ElseIf delta < -0.5
 		Float heal = 0.0 - delta
 		Int healInt = heal as Int
-		String line = "heal amt=" + healInt + " source=" + sourceName + " aggressor=" + who
+		String line = "heal target=" + SlotTag() + " amt=" + healInt + " source=" + sourceName + " aggressor=" + who
 		Debug.TraceUser("TrainingDummy", line)
 		TrainingDummyUI.LogHit(0.0 - heal, line)
 		If DummyQuest
@@ -388,7 +388,7 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 	If delta > 0.0
 		LastHealth = remaining
 		Int dmgInt = delta as Int
-		String line = "hit dmg=" + dmgInt + " source=" + sourceName + " aggressor=?"
+		String line = "hit target=" + SlotTag() + " dmg=" + dmgInt + " source=" + sourceName + " aggressor=?"
 		Debug.TraceUser("TrainingDummy", line)
 		TrainingDummyUI.LogHit(delta, line)
 		If DummyQuest
@@ -412,7 +412,7 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 	EndIf
 	LastHealth = remaining
 	Int healInt = heal as Int
-	String line = "heal amt=" + healInt + " source=" + sourceName + " aggressor=?"
+	String line = "heal target=" + SlotTag() + " amt=" + healInt + " source=" + sourceName + " aggressor=?"
 	Debug.TraceUser("TrainingDummy", line)
 	TrainingDummyUI.LogHit(0.0 - heal, line)
 	If DummyQuest
@@ -420,6 +420,14 @@ Function ReportHealthDrop(Actor dummy, String sourceName)
 	Else
 		Debug.Notification("Dummy heal: " + healInt)
 	EndIf
+EndFunction
+
+; M1..M3 / F1..F3 from the quest alias grid.
+String Function SlotTag()
+	If DummyQuest
+		Return DummyQuest.SlotTagForAlias(Self as ReferenceAlias)
+	EndIf
+	Return "?"
 EndFunction
 
 ; Pin without breaking combat — restrained stops the run-in-place.

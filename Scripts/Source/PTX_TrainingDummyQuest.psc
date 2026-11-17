@@ -37,9 +37,9 @@ Bool Property Immortal = True Auto
 Float Property DownSeconds = 10.0 Auto
 Bool Property MuteNotifications = True Auto
 ; Toward the player: -4 Archnemesis … 3 Lover. Two separate packs:
-; Rival+ → HostileFaction + PackFaction (Ally to each other, Enemy to you).
-; Friend+ → FriendFaction + FriendPackFaction (Ally to each other and to you).
-; Acquaintance → SafeFaction only. SafeFaction is always on for crime-immunity.
+; Rival+ → HostileFaction + PackFaction (Ally to each other, Enemy to you and to Friend+).
+; Friend+ → FriendFaction + FriendPackFaction (Ally to each other and to you, Enemy to Rival+).
+; Acquaintance → SafeFaction only (crime-immune). Packs carry their own crime flags.
 Int Property RelationshipRank = 3 Auto
 Faction Property HostileFaction Auto
 Faction Property SafeFaction Auto
@@ -652,7 +652,7 @@ Faction Function ResolveSafeFaction()
 	If SafeFaction
 		Return SafeFaction
 	EndIf
-	; PTX_TrainingDummyFaction (0x804) — crime-immune at every rank.
+	; PTX_TrainingDummyFaction (0x804) — Acquaintance only (crime-immune, no pack links).
 	SafeFaction = Game.GetFormFromFile(0x804, "PTX_TrainingDummy.esp") as Faction
 	Return SafeFaction
 EndFunction
@@ -731,16 +731,38 @@ Function ConfigureDummy(Actor dummy)
 	If bandit && dummy.IsInFaction(bandit)
 		dummy.RemoveFromFaction(bandit)
 	EndIf
-	; SafeFaction: crime-immune for every rank (no Ally links).
 	; Rival+: hostile pack (Hostile + Pack). Friend+: friend pack (Friend + FriendPack).
-	; Acquaintance: Safe only. Packs do not Ally across ranks.
+	; Acquaintance: Safe only. Packs are Enemy across ranks (ESP relations) so a
+	; Cast an aura hex on Rival+ does not treat Friend+ as same-side Neutrals.
+	; SafeFaction stays off the packs so shared-faction Neutral cannot soften that.
 	Bool hostile = rank <= -2
 	Bool friendly = rank >= 0
-	SetFactionMembership(dummy, ResolveSafeFaction(), True)
+	SetFactionMembership(dummy, ResolveSafeFaction(), !hostile && !friendly)
 	SetFactionMembership(dummy, ResolveHostileFaction(), hostile)
 	SetFactionMembership(dummy, ResolvePackFaction(), hostile)
 	SetFactionMembership(dummy, ResolveFriendFaction(), friendly)
 	SetFactionMembership(dummy, ResolveFriendPackFaction(), friendly)
+EndFunction
+
+; Log / UI tag for a filled alias: M1..M3 / F1..F3 (matches the status grid).
+String Function SlotTagForAlias(ReferenceAlias slot)
+	If !slot
+		Return "?"
+	EndIf
+	If slot == MaleAlias0
+		Return "M1"
+	ElseIf slot == MaleAlias1
+		Return "M2"
+	ElseIf slot == MaleAlias2
+		Return "M3"
+	ElseIf slot == FemaleAlias0
+		Return "F1"
+	ElseIf slot == FemaleAlias1
+		Return "F2"
+	ElseIf slot == FemaleAlias2
+		Return "F3"
+	EndIf
+	Return "?"
 EndFunction
 
 Function Notify(String asText)

@@ -273,7 +273,7 @@ namespace tdui::ui {
             }
             EndCombo();
         }
-        TextDisabled("Enemy pack: Ally to each other, Enemy to you. Ally pack: Ally to each other and to you.");
+        TextDisabled("Enemy pack: Ally to each other, Enemy to you and to Ally pack. Ally pack: Ally to each other and to you.");
 
         if (settingsDirty) {
             settings_.level = std::clamp(settings_.level, 1, 1000);

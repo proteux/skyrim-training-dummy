@@ -217,7 +217,9 @@ playerEnemy.Target.SetTo(new FormKey(skyrim, 0xDB1)); // PlayerFaction
 hostileFaction.Relations.Add(playerEnemy);
 mod.Factions.Add(hostileFaction);
 
-// 0x804: every dummy, every rank — crime-immune only (no Ally links; that would merge packs).
+// 0x804: Acquaintance only — crime-immune with no Ally/Enemy links. Pack ranks use their
+// own factions' crime flags instead, so a shared Safe membership cannot Neutralize the
+// Rival+ ↔ Friend+ Enemy relations below.
 var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
 {
     EditorID = "PTX_TrainingDummyFaction",
@@ -268,6 +270,25 @@ var packAllyFriend = new Relation { Reaction = CombatReaction.Ally };
 packAllyFriend.Target.SetTo(friendFaction.FormKey);
 friendPackFaction.Relations.Add(packAllyFriend);
 mod.Factions.Add(friendPackFaction);
+
+// Cross-pack Enemy both ways. Cast an aura hits anyone who isn't an enemy of the
+// wearer (Neutral counts as same-side), so without this a Rival+ hex aura also
+// burns Friend+ dummies. SafeFaction is Acquaintance-only so shared-faction
+// Neutral cannot soften these links.
+void LinkEnemy(Faction from, Faction to)
+{
+    var rel = new Relation { Reaction = CombatReaction.Enemy };
+    rel.Target.SetTo(to.FormKey);
+    from.Relations.Add(rel);
+}
+LinkEnemy(hostileFaction, friendFaction);
+LinkEnemy(friendFaction, hostileFaction);
+LinkEnemy(hostileFaction, friendPackFaction);
+LinkEnemy(friendPackFaction, hostileFaction);
+LinkEnemy(packFaction, friendFaction);
+LinkEnemy(friendFaction, packFaction);
+LinkEnemy(packFaction, friendPackFaction);
+LinkEnemy(friendPackFaction, packFaction);
 
 questScript.Properties.Add(new ScriptObjectProperty
 {
