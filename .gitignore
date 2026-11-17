@@ -4,4 +4,4 @@ tools/*/bin/
 tools/*/obj/
 *.pex
 build.local.sh
-.cursor/
+.cursor/debug*.log

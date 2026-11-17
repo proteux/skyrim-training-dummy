@@ -247,18 +247,19 @@ namespace tdui::ui {
         }
 
         // Ranks match Actor.SetRelationshipRank / the Creation Kit.
+        // Faction tag: Rival+ = Enemy pack, Acquaintance = Neutral, Friend+ = Ally pack.
         static constexpr const char* kRankLabels[] = {
-            "Archnemesis (-4)",
-            "Enemy (-3)",
-            "Rival (-2)",
-            "Acquaintance (-1)",
-            "Friend (0)",
-            "Confidant (1)",
-            "Ally (2)",
-            "Lover (3)",
+            "Archnemesis (-4) - Enemy Faction",
+            "Enemy (-3) - Enemy Faction",
+            "Rival (-2) - Enemy Faction",
+            "Acquaintance (-1) - Neutral Faction",
+            "Friend (0) - Ally Faction",
+            "Confidant (1) - Ally Faction",
+            "Ally (2) - Ally Faction",
+            "Lover (3) - Ally Faction",
         };
         const int rankIndex = std::clamp(settings_.relationshipRank + 4, 0, 7);
-        SetNextItemWidth(220);
+        SetNextItemWidth(320);
         if (BeginCombo("vs player", kRankLabels[rankIndex])) {
             for (int i = 0; i < 8; ++i) {
                 const bool selected = i == rankIndex;
@@ -272,7 +273,7 @@ namespace tdui::ui {
             }
             EndCombo();
         }
-        TextDisabled("Ally/Friend: same side as player for Cast an aura on you; Enemy: hex-aura neighbour tests.");
+        TextDisabled("Enemy pack: Ally to each other, Enemy to you. Ally pack: Ally to each other and to you.");
 
         if (settingsDirty) {
             settings_.level = std::clamp(settings_.level, 1, 1000);

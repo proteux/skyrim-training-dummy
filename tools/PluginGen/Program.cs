@@ -217,7 +217,7 @@ playerEnemy.Target.SetTo(new FormKey(skyrim, 0xDB1)); // PlayerFaction
 hostileFaction.Relations.Add(playerEnemy);
 mod.Factions.Add(hostileFaction);
 
-// 0x804: every dummy, every rank — crime-immune even when not "Enemy".
+// 0x804: every dummy, every rank — crime-immune only (no Ally links; that would merge packs).
 var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
 {
     EditorID = "PTX_TrainingDummyFaction",
@@ -226,22 +226,48 @@ var safeFaction = new Faction(F(0x804), SkyrimRelease.SkyrimSE)
 };
 mod.Factions.Add(safeFaction);
 
-// 0x80F: second pack faction. GetFactionReaction returns Neutral for two actors who
-// only share one faction; Ally/Friend need a cross-faction relation. Every dummy is
-// in Safe + Pack with Ally both ways, so packmates read as Ally (not town Neutral).
+// 0x80F: hostile pack partner. Rival+ join HostileFaction + PackFaction; Ally both ways so
+// GetFactionReaction between hostiles is Ally. Not linked to Safe or Friend factions.
 var packFaction = new Faction(F(0x80F), SkyrimRelease.SkyrimSE)
 {
     EditorID = "PTX_TrainingDummyPackFaction",
-    Name = "Training Dummy Pack",
+    Name = "Training Dummy Hostile Pack",
     Flags = dummyCrimeFlags,
 };
-var safeAllyPack = new Relation { Reaction = CombatReaction.Ally };
-safeAllyPack.Target.SetTo(packFaction.FormKey);
-safeFaction.Relations.Add(safeAllyPack);
-var packAllySafe = new Relation { Reaction = CombatReaction.Ally };
-packAllySafe.Target.SetTo(safeFaction.FormKey);
-packFaction.Relations.Add(packAllySafe);
+var hostileAllyPack = new Relation { Reaction = CombatReaction.Ally };
+hostileAllyPack.Target.SetTo(packFaction.FormKey);
+hostileFaction.Relations.Add(hostileAllyPack);
+var packAllyHostile = new Relation { Reaction = CombatReaction.Ally };
+packAllyHostile.Target.SetTo(hostileFaction.FormKey);
+packFaction.Relations.Add(packAllyHostile);
 mod.Factions.Add(packFaction);
+
+// 0x810: Friend+ — Ally to PlayerFaction. 0x811 FriendPack — Ally with FriendFaction so
+// Friend+ dummies are Ally to each other without sharing the hostile pack.
+var friendFaction = new Faction(F(0x810), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyFriendFaction",
+    Name = "Training Dummy Friend",
+    Flags = dummyCrimeFlags,
+};
+var friendAllyPlayer = new Relation { Reaction = CombatReaction.Ally };
+friendAllyPlayer.Target.SetTo(new FormKey(skyrim, 0xDB1)); // PlayerFaction
+friendFaction.Relations.Add(friendAllyPlayer);
+mod.Factions.Add(friendFaction);
+
+var friendPackFaction = new Faction(F(0x811), SkyrimRelease.SkyrimSE)
+{
+    EditorID = "PTX_TrainingDummyFriendPackFaction",
+    Name = "Training Dummy Friend Pack",
+    Flags = dummyCrimeFlags,
+};
+var friendAllyPack = new Relation { Reaction = CombatReaction.Ally };
+friendAllyPack.Target.SetTo(friendPackFaction.FormKey);
+friendFaction.Relations.Add(friendAllyPack);
+var packAllyFriend = new Relation { Reaction = CombatReaction.Ally };
+packAllyFriend.Target.SetTo(friendFaction.FormKey);
+friendPackFaction.Relations.Add(packAllyFriend);
+mod.Factions.Add(friendPackFaction);
 
 questScript.Properties.Add(new ScriptObjectProperty
 {
@@ -260,6 +286,18 @@ questScript.Properties.Add(new ScriptObjectProperty
     Name = "PackFaction",
     Flags = ScriptProperty.Flag.Edited,
     Object = new FormLink<ISkyrimMajorRecordGetter>(packFaction.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "FriendFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(friendFaction.FormKey),
+});
+questScript.Properties.Add(new ScriptObjectProperty
+{
+    Name = "FriendPackFaction",
+    Flags = ScriptProperty.Flag.Edited,
+    Object = new FormLink<ISkyrimMajorRecordGetter>(friendPackFaction.FormKey),
 });
 
 // --- NPCs: one ActorBase per slot (outfit / Dress Up Lover's key off base) ---

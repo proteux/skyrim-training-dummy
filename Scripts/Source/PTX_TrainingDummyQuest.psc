@@ -36,15 +36,19 @@ Bool Property Immortal = True Auto
 ; Real seconds down after bleedout / death before full recovery (0 = stay down until Heal now).
 Float Property DownSeconds = 10.0 Auto
 Bool Property MuteNotifications = True Auto
-; Toward the player: -4 Archnemesis … 3 Lover. Enemy (-3) / Archnemesis also join
-; HostileFaction (enemy only to PlayerFaction) so IsHostileToActor(player) is true
-; for harmful Cast an aura effects without making town guards attack them. SafeFaction is
-; always applied so hitting / hexing a dummy does not report as town assault.
+; Toward the player: -4 Archnemesis … 3 Lover. Two separate packs:
+; Rival+ → HostileFaction + PackFaction (Ally to each other, Enemy to you).
+; Friend+ → FriendFaction + FriendPackFaction (Ally to each other and to you).
+; Acquaintance → SafeFaction only. SafeFaction is always on for crime-immunity.
 Int Property RelationshipRank = 3 Auto
 Faction Property HostileFaction Auto
 Faction Property SafeFaction Auto
-; Cross-faction Ally with SafeFaction so GetFactionReaction between dummies is Ally.
+; Hostile pack partner (Ally with HostileFaction). Rival+ only.
 Faction Property PackFaction Auto
+; Friend+ — Ally to PlayerFaction.
+Faction Property FriendFaction Auto
+; Friend pack partner (Ally with FriendFaction). Friend+ only.
+Faction Property FriendPackFaction Auto
 
 Event OnInit()
 	RegisterForSingleUpdate(2.0)
@@ -657,9 +661,27 @@ Faction Function ResolvePackFaction()
 	If PackFaction
 		Return PackFaction
 	EndIf
-	; PTX_TrainingDummyPackFaction (0x80F) — Ally with SafeFaction for pack GetFactionReaction.
+	; PTX_TrainingDummyPackFaction (0x80F) — Ally with HostileFaction; Rival+ pack.
 	PackFaction = Game.GetFormFromFile(0x80F, "PTX_TrainingDummy.esp") as Faction
 	Return PackFaction
+EndFunction
+
+Faction Function ResolveFriendFaction()
+	If FriendFaction
+		Return FriendFaction
+	EndIf
+	; PTX_TrainingDummyFriendFaction (0x810) — Ally to PlayerFaction for Friend+ ranks.
+	FriendFaction = Game.GetFormFromFile(0x810, "PTX_TrainingDummy.esp") as Faction
+	Return FriendFaction
+EndFunction
+
+Faction Function ResolveFriendPackFaction()
+	If FriendPackFaction
+		Return FriendPackFaction
+	EndIf
+	; PTX_TrainingDummyFriendPackFaction (0x811) — Ally with FriendFaction; Friend+ pack.
+	FriendPackFaction = Game.GetFormFromFile(0x811, "PTX_TrainingDummy.esp") as Faction
+	Return FriendPackFaction
 EndFunction
 
 Function SetFactionMembership(Actor dummy, Faction akFaction, Bool wantIn)
@@ -709,11 +731,16 @@ Function ConfigureDummy(Actor dummy)
 	If bandit && dummy.IsInFaction(bandit)
 		dummy.RemoveFromFaction(bandit)
 	EndIf
-	; Always crime-immune + pack Ally pair (Safe+Pack). Enemy / Archnemesis also get
-	; the player-hostile faction so IsHostileToActor works without involving guards.
+	; SafeFaction: crime-immune for every rank (no Ally links).
+	; Rival+: hostile pack (Hostile + Pack). Friend+: friend pack (Friend + FriendPack).
+	; Acquaintance: Safe only. Packs do not Ally across ranks.
+	Bool hostile = rank <= -2
+	Bool friendly = rank >= 0
 	SetFactionMembership(dummy, ResolveSafeFaction(), True)
-	SetFactionMembership(dummy, ResolvePackFaction(), True)
-	SetFactionMembership(dummy, ResolveHostileFaction(), rank <= -3)
+	SetFactionMembership(dummy, ResolveHostileFaction(), hostile)
+	SetFactionMembership(dummy, ResolvePackFaction(), hostile)
+	SetFactionMembership(dummy, ResolveFriendFaction(), friendly)
+	SetFactionMembership(dummy, ResolveFriendPackFaction(), friendly)
 EndFunction
 
 Function Notify(String asText)

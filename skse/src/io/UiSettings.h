@@ -16,7 +16,7 @@ namespace tdui::io {
         // Real seconds down after bleedout / death before full recovery (0 = stay down until Heal now).
         float downSeconds = 10.0f;
         bool muteNotifications = true;
-        // Toward the player: -4 Archnemesis … 3 Lover (default). Enemy/Archnemesis join a player-only hostile faction for IsHostileToActor.
+        // Toward the player: -4 Archnemesis … 3 Lover (default). Rival+ = hostile pack; Friend+ = friend pack; packs are separate.
         int relationshipRank = 3;
 
         void Load(const std::filesystem::path& path);
